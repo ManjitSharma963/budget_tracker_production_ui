@@ -1,0 +1,82 @@
+.add-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #ff6b35 0%, #ff8c5a 100%);
+  color: white;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 
+    0 2px 8px rgba(255, 107, 53, 0.4),
+    0 1px 4px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  animation: slideInUp 0.5s ease-out 0.8s both;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.add-button:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 
+    0 4px 12px rgba(255, 107, 53, 0.5),
+    0 2px 6px rgba(0, 0, 0, 0.3);
+  background: linear-gradient(135deg, #ff8c5a 0%, #ff6b35 100%);
+}
+
+.add-button:active {
+  transform: translateY(0) scale(1.02);
+  box-shadow: 
+    0 2px 8px rgba(255, 107, 53, 0.4),
+    0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.add-icon {
+  font-size: 20px;
+  font-weight: 300;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  transition: all 0.3s ease;
+}
+
+.add-button:hover .add-icon {
+  transform: rotate(90deg);
+}
+
+.add-button:active .add-icon {
+  transform: rotate(90deg) scale(0.9);
+}
+
+/* Mobile optimizations */
+@media (max-width: 480px) {
+  .add-button {
+    width: 26px;
+    height: 26px;
+  }
+  
+  .add-icon {
+    font-size: 18px;
+  }
+}
+

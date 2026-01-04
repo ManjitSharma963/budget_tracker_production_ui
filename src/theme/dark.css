@@ -1,0 +1,143 @@
+/* Dark Mode Styles */
+.app-container.dark-mode {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  color: #e0e0e0;
+}
+
+.app-container.dark-mode .content-section {
+  background: transparent;
+}
+
+/* Header Dark Mode */
+.app-container.dark-mode .header {
+  background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-container.dark-mode .header-title {
+  color: #e0e0e0;
+}
+
+/* Toggle Switch Dark Mode */
+.app-container.dark-mode .toggle-container {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-container.dark-mode .toggle-btn {
+  color: #b0b0b0;
+}
+
+.app-container.dark-mode .toggle-btn.active {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+/* Search Bar Dark Mode */
+.app-container.dark-mode .search-bar-container {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.app-container.dark-mode .search-input,
+.app-container.dark-mode .date-input {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #e0e0e0;
+}
+
+.app-container.dark-mode .search-input:focus,
+.app-container.dark-mode .date-input:focus {
+  border-color: #ff6b35;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Transaction Items Dark Mode */
+.app-container.dark-mode .transaction-item {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.app-container.dark-mode .transaction-description {
+  color: #e0e0e0;
+}
+
+.app-container.dark-mode .transaction-payment-mode {
+  background: rgba(255, 255, 255, 0.05);
+  color: #b0b0b0;
+}
+
+/* Date Header Dark Mode */
+.app-container.dark-mode .date-header {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.app-container.dark-mode .date-text {
+  color: #e0e0e0;
+}
+
+/* Modal Dark Mode */
+.app-container.dark-mode .modal-content {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.app-container.dark-mode .modal-header {
+  background: linear-gradient(135deg, #0f3460 0%, #16213e 100%);
+  border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.app-container.dark-mode .modal-title {
+  color: #e0e0e0;
+}
+
+.app-container.dark-mode .form-input {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #e0e0e0;
+}
+
+.app-container.dark-mode .form-input:focus {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #ff6b35;
+}
+
+.app-container.dark-mode .form-group label {
+  color: #b0b0b0;
+}
+
+/* Statistics Cards Dark Mode */
+.app-container.dark-mode .stat-card {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.app-container.dark-mode .stat-label {
+  color: #b0b0b0;
+}
+
+/* Pie Chart Dark Mode */
+.app-container.dark-mode .pie-chart-container {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.app-container.dark-mode .chart-total {
+  color: #e0e0e0;
+}
+
+/* Credits Dark Mode */
+.app-container.dark-mode .credit-item {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.app-container.dark-mode .credit-person {
+  color: #e0e0e0;
+}
+
+.app-container.dark-mode .credit-note {
+  color: #b0b0b0;
+}
+
