@@ -4,17 +4,19 @@ const getApiBaseUrl = () => {
   // Check if we're in a browser environment
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
-    const protocol = window.location.protocol;
+    const protocol = window.location.protocol; // Will be 'https:' or 'http:'
     const port = window.location.port;
     
     // If accessing from a public IP or domain, use same protocol/host but /api path
     // This assumes nginx/apache is proxying /api to backend:8080
     if (host !== 'localhost' && host !== '127.0.0.1') {
-      // Use same domain WITHOUT port 8080, let reverse proxy handle routing
-      // Only include port if it's not 80/443 (standard HTTP/HTTPS ports)
-      if (port && port !== '80' && port !== '443') {
+      // Use same protocol (http/https) and domain WITHOUT port 8080
+      // Only include port if it's a non-standard port (not 80/443)
+      // NEVER use port 8080 for production domains - nginx handles routing
+      if (port && port !== '80' && port !== '443' && port !== '8080') {
         return `${protocol}//${host}:${port}/api`;
       }
+      // Use same protocol as the page (https if page is https, http if page is http)
       return `${protocol}//${host}/api`;
     }
   }
