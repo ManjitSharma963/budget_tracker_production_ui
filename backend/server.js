@@ -13,7 +13,13 @@ const app = express();
 const PORT = process.env.PORT || 8080;
 
 // Middleware
-app.use(cors());
+// Configure CORS to allow requests from any origin (including public IPs)
+app.use(cors({
+  origin: true, // Allow all origins
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -719,7 +725,8 @@ app.delete('/api/notes/:id', authenticateToken, (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`🚀 Server is running on http://localhost:${PORT}`);
-  console.log(`📊 API endpoints available at http://localhost:${PORT}/api`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server is running on http://0.0.0.0:${PORT}`);
+  console.log(`📊 API endpoints available at http://0.0.0.0:${PORT}/api`);
+  console.log(`🌐 Accessible from: http://localhost:${PORT} or http://YOUR_IP:${PORT}`);
 });
