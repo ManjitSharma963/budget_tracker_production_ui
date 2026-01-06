@@ -14,24 +14,56 @@ const PORT = process.env.PORT || 8080;
 
 // Middleware
 // Configure CORS to allow requests from any origin (including public IPs)
+// IMPORTANT: CORS must be applied BEFORE any routes
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    // Allow all origins for now (you can restrict this in production)
+    // Allow all origins
     callback(null, true);
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
+  exposedHeaders: ['Content-Type', 'Authorization'],
   preflightContinue: false,
-  optionsSuccessStatus: 204
+  optionsSuccessStatus: 200 // Some browsers expect 200 instead of 204
 };
 
+// Apply CORS to all routes
 app.use(cors(corsOptions));
 
-// Handle preflight requests explicitly
-app.options('*', cors(corsOptions));
+// Explicitly handle OPTIONS preflight requests for all routes
+// This MUST be before other routes
+app.options('*', (req, res) => {
+  const origin = req.headers.origin || '*';
+  console.log('🔄 OPTIONS preflight request from:', origin);
+  res.header('Access-Control-Allow-Origin', origin);
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS, PATCH');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Max-Age', '86400'); // 24 hours
+  res.sendStatus(200);
+});
+
+// Also handle OPTIONS for specific auth routes
+app.options('/api/auth/login', (req, res) => {
+  const origin = req.headers.origin || '*';
+  res.header('Access-Control-Allow-Origin', origin);
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
+
+app.options('/api/auth/register', (req, res) => {
+  const origin = req.headers.origin || '*';
+  res.header('Access-Control-Allow-Origin', origin);
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
 
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -92,8 +124,15 @@ initializeDatabase();
 
 // Register endpoint (public - no auth required)
 app.post('/api/auth/register', (req, res) => {
+  // Set CORS headers explicitly
+  const origin = req.headers.origin || '*';
+  res.header('Access-Control-Allow-Origin', origin);
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
   try {
-    console.log('📝 Register request received from:', req.headers.origin || req.headers.host);
+    console.log('📝 Register request received from:', origin);
     const { username, email, password } = req.body;
     
     if (!username || !email || !password) {
@@ -114,8 +153,15 @@ app.post('/api/auth/register', (req, res) => {
 
 // Login endpoint (public - no auth required)
 app.post('/api/auth/login', (req, res) => {
+  // Set CORS headers explicitly
+  const origin = req.headers.origin || '*';
+  res.header('Access-Control-Allow-Origin', origin);
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  
   try {
-    console.log('🔐 Login request received from:', req.headers.origin || req.headers.host);
+    console.log('🔐 Login request received from:', origin);
     console.log('📧 Email:', req.body?.email ? 'provided' : 'missing');
     
     const { email, password } = req.body;
