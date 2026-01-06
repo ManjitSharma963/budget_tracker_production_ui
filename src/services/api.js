@@ -26,6 +26,11 @@ const getApiBaseUrl = () => {
 
 const API_BASE_URL = getApiBaseUrl();
 
+// Debug: Log API URL in development
+if (import.meta.env.DEV) {
+  console.log('🔗 API Base URL:', API_BASE_URL);
+}
+
 // Get auth token from localStorage
 const getAuthToken = () => {
   return localStorage.getItem('authToken');
