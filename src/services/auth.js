@@ -10,8 +10,12 @@ const getApiBaseUrl = () => {
     // If accessing from a public IP or domain, use same protocol/host but /api path
     // This assumes nginx/apache is proxying /api to backend:8080
     if (host !== 'localhost' && host !== '127.0.0.1') {
-      // Use same domain, let reverse proxy handle routing to backend
-      return `${protocol}//${host}${port ? `:${port}` : ''}/api`;
+      // Use same domain WITHOUT port 8080, let reverse proxy handle routing
+      // Only include port if it's not 80/443 (standard HTTP/HTTPS ports)
+      if (port && port !== '80' && port !== '443') {
+        return `${protocol}//${host}:${port}/api`;
+      }
+      return `${protocol}//${host}/api`;
     }
   }
   // Default to localhost for local development
