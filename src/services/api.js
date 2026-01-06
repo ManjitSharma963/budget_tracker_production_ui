@@ -30,6 +30,8 @@ const apiCall = async (endpoint, options = {}) => {
   
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
+  } else {
+    console.warn('No auth token found for request to:', endpoint);
   }
   
   try {
@@ -37,6 +39,29 @@ const apiCall = async (endpoint, options = {}) => {
       headers,
       ...options,
     });
+
+    // Handle 403 Forbidden - authentication issue
+    if (response.status === 403) {
+      const text = await response.text();
+      let errorMessage = 'Access denied. Please login again.';
+      try {
+        const data = JSON.parse(text);
+        errorMessage = data.error || errorMessage;
+      } catch (e) {
+        // If parsing fails, use default message
+      }
+      
+      // Clear invalid token
+      if (token) {
+        localStorage.removeItem('authToken');
+        // Reload page to redirect to login
+        if (typeof window !== 'undefined') {
+          window.location.reload();
+        }
+      }
+      
+      throw new Error(errorMessage);
+    }
 
     // Handle 204 No Content (DELETE requests)
     if (response.status === 204) {
@@ -59,7 +84,7 @@ const apiCall = async (endpoint, options = {}) => {
   } catch (error) {
     // Handle network errors
     if (error.name === 'TypeError' && error.message.includes('fetch')) {
-      throw new Error('Unable to connect to server. Please make sure the API server is running on http://localhost:8080');
+      throw new Error('Unable to connect to server. Please make sure the API server is running.');
     }
     console.error('API Error:', error);
     throw error;

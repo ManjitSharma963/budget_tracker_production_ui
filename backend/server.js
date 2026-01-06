@@ -14,12 +14,25 @@ const PORT = process.env.PORT || 8080;
 
 // Middleware
 // Configure CORS to allow requests from any origin (including public IPs)
-app.use(cors({
-  origin: true, // Allow all origins
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    // Allow all origins for now (you can restrict this in production)
+    callback(null, true);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-}));
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
+};
+
+app.use(cors(corsOptions));
+
+// Handle preflight requests explicitly
+app.options('*', cors(corsOptions));
+
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -77,9 +90,10 @@ initializeDatabase();
 
 // ==================== AUTHENTICATION ENDPOINTS ====================
 
-// Register endpoint
+// Register endpoint (public - no auth required)
 app.post('/api/auth/register', (req, res) => {
   try {
+    console.log('📝 Register request received from:', req.headers.origin || req.headers.host);
     const { username, email, password } = req.body;
     
     if (!username || !email || !password) {
@@ -93,22 +107,29 @@ app.post('/api/auth/register', (req, res) => {
     const result = registerUser(username, email, password);
     res.status(201).json(result);
   } catch (error) {
+    console.error('❌ Registration error:', error.message);
     res.status(400).json({ error: error.message });
   }
 });
 
-// Login endpoint
+// Login endpoint (public - no auth required)
 app.post('/api/auth/login', (req, res) => {
   try {
+    console.log('🔐 Login request received from:', req.headers.origin || req.headers.host);
+    console.log('📧 Email:', req.body?.email ? 'provided' : 'missing');
+    
     const { email, password } = req.body;
     
     if (!email || !password) {
+      console.log('❌ Missing email or password');
       return res.status(400).json({ error: 'Email and password are required' });
     }
     
     const result = loginUser(email, password);
+    console.log('✅ Login successful for:', email);
     res.json(result);
   } catch (error) {
+    console.error('❌ Login error:', error.message);
     res.status(401).json({ error: error.message });
   }
 });
@@ -724,9 +745,28 @@ app.delete('/api/notes/:id', authenticateToken, (req, res) => {
   }
 });
 
+// Error handling middleware (should be after all routes)
+app.use((err, req, res, next) => {
+  console.error('❌ Server Error:', err);
+  res.status(err.status || 500).json({
+    error: err.message || 'Internal server error'
+  });
+});
+
+// 404 handler for undefined routes
+app.use((req, res) => {
+  console.log('❌ Route not found:', req.method, req.path);
+  res.status(404).json({
+    error: 'Route not found',
+    path: req.path,
+    method: req.method
+  });
+});
+
 // Start server
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server is running on http://0.0.0.0:${PORT}`);
   console.log(`📊 API endpoints available at http://0.0.0.0:${PORT}/api`);
   console.log(`🌐 Accessible from: http://localhost:${PORT} or http://YOUR_IP:${PORT}`);
+  console.log(`🔐 Auth endpoints: POST /api/auth/login, POST /api/auth/register`);
 });

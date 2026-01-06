@@ -139,12 +139,14 @@ export const authenticateToken = (req, res, next) => {
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
   if (!token) {
+    console.log('❌ No token provided in request to:', req.method, req.path);
     return res.status(403).json({ error: 'Access token required' });
   }
 
   const user = getUserByToken(token);
   if (!user) {
-    return res.status(403).json({ error: 'Invalid or expired token' });
+    console.log('❌ Invalid token for request to:', req.method, req.path);
+    return res.status(403).json({ error: 'Invalid or expired token. Please login again.' });
   }
 
   req.user = user;
