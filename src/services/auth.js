@@ -4,9 +4,14 @@ const getApiBaseUrl = () => {
   // Check if we're in a browser environment
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
-    // If accessing from a public IP or domain, use that for the API
+    const protocol = window.location.protocol;
+    const port = window.location.port;
+    
+    // If accessing from a public IP or domain, use same protocol/host but /api path
+    // This assumes nginx/apache is proxying /api to backend:8080
     if (host !== 'localhost' && host !== '127.0.0.1') {
-      return `http://${host}:8080/api`;
+      // Use same domain, let reverse proxy handle routing to backend
+      return `${protocol}//${host}${port ? `:${port}` : ''}/api`;
     }
   }
   // Default to localhost for local development
