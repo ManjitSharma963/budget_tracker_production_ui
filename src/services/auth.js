@@ -1,6 +1,11 @@
 // API Configuration
 // Use environment variable or detect the current host
 const getApiBaseUrl = () => {
+  // Priority 1: Environment variable (for local dev connecting to production)
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  
   // Check if we're in a browser environment
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
@@ -21,12 +26,12 @@ const getApiBaseUrl = () => {
     }
   }
   // Default to localhost for local development
-  return import.meta.env.VITE_API_URL || 'http://localhost:8080/api';
+  return 'http://localhost:8080/api';
 };
 
 const API_BASE_URL = getApiBaseUrl()
 
-// Debug: Log API URL in development
+// Debug: Log API URL only in development
 if (import.meta.env.DEV) {
   console.log('🔗 API Base URL:', API_BASE_URL);
 }
