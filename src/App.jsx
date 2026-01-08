@@ -2,18 +2,23 @@ import React, { useState, useEffect } from 'react'
 import Header from './components/Header'
 import Login from './components/Login'
 import Register from './components/Register'
-import ToggleSwitch from './components/ToggleSwitch'
+import BurgerMenu from './components/BurgerMenu'
 import PieChart from './components/PieChart'
 import TransactionList from './components/TransactionList'
 import CreditsList from './components/CreditsList'
 import NotesList from './components/NotesList'
+import PartyList from './components/PartyList'
+import PartyDetailsModal from './components/PartyDetailsModal'
+import Dashboard from './components/Dashboard'
 import AddExpenseModal from './components/AddExpenseModal'
 import AddNoteModal from './components/AddNoteModal'
+import AddPartyModal from './components/AddPartyModal'
+import AddLedgerEntryModal from './components/AddLedgerEntryModal'
 import SearchBar from './components/SearchBar'
 import MonthlySummary from './components/MonthlySummary'
 import StatisticsCards from './components/StatisticsCards'
 import Toast from './components/Toast'
-import { expensesAPI, incomeAPI, creditsAPI, notesAPI } from './services/api'
+import { expensesAPI, incomeAPI, creditsAPI, notesAPI, partiesAPI, ledgerAPI } from './services/api'
 import { mapExpenseFromAPI, mapExpenseToAPI, mapIncomeFromAPI, mapIncomeToAPI, mapCreditFromAPI, mapCreditToAPI } from './utils/dataMapper'
 import { exportTransactionsToCSV, exportCreditsToCSV } from './utils/csvExport'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
@@ -28,14 +33,23 @@ function App() {
   const [authError, setAuthError] = useState('')
   const [checkingAuth, setCheckingAuth] = useState(true)
   
-  const [viewMode, setViewMode] = useState('expenses')
+  const [viewMode, setViewMode] = useState('dashboard')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editTransaction, setEditTransaction] = useState(null)
   const [editNote, setEditNote] = useState(null)
   const [transactions, setTransactions] = useState([])
   const [credits, setCredits] = useState([])
   const [notes, setNotes] = useState([])
+  const [parties, setParties] = useState([])
+  const [selectedParty, setSelectedParty] = useState(null)
+  const [ledgerEntries, setLedgerEntries] = useState([])
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
+  const [isPartyModalOpen, setIsPartyModalOpen] = useState(false)
+  const [isPartyDetailsModalOpen, setIsPartyDetailsModalOpen] = useState(false)
+  const [isLedgerEntryModalOpen, setIsLedgerEntryModalOpen] = useState(false)
+  const [editParty, setEditParty] = useState(null)
+  const [editLedgerEntry, setEditLedgerEntry] = useState(null)
+  const [ledgerEntryType, setLedgerEntryType] = useState('payment') // Default to payment
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -82,12 +96,13 @@ function App() {
       setLoading(true)
       setError(null)
       try {
-        // Fetch expenses, income, credits, and notes in parallel
-        const [expensesData, incomeData, creditsData, notesData] = await Promise.all([
+        // Fetch expenses, income, credits, notes, and parties in parallel
+        const [expensesData, incomeData, creditsData, notesData, partiesData] = await Promise.all([
           expensesAPI.getAll().catch(() => []),
           incomeAPI.getAll().catch(() => []),
           creditsAPI.getAll().catch(() => []),
-          notesAPI.getAll().catch(() => [])
+          notesAPI.getAll().catch(() => []),
+          partiesAPI.getAll().catch(() => [])
         ])
 
         // Map API data to UI format
@@ -100,11 +115,93 @@ function App() {
         const mappedCredits = Array.isArray(creditsData)
           ? creditsData.map(mapCreditFromAPI)
           : []
+        
+        // Map parties data (phone -> contact)
+        let mappedParties = Array.isArray(partiesData)
+          ? partiesData.map(party => ({
+              ...party,
+              contact: party.phone || party.contact
+            }))
+          : []
+
+        // Load ledger data for all parties to calculate totals
+        try {
+          const ledgerPromises = mappedParties.map(async (party) => {
+            try {
+              const ledgerData = await partiesAPI.getLedger(party.id)
+              const entries = Array.isArray(ledgerData) ? ledgerData : []
+              
+              // Calculate totals from ledger entries
+              let totalPurchases = 0
+              let totalPayments = 0
+              
+              entries.forEach(entry => {
+                const type = entry.transactionType?.toUpperCase() || entry.type?.toUpperCase()
+                const amount = entry.amount || 0
+                
+                if (type === 'PURCHASE') {
+                  totalPurchases += amount
+                } else if (type === 'PAYMENT') {
+                  totalPayments += amount
+                } else if (type === 'ADJUSTMENT') {
+                  // Adjustments can be positive or negative
+                  if (amount > 0) {
+                    totalPurchases += amount
+                  } else {
+                    totalPayments += Math.abs(amount)
+                  }
+                }
+              })
+              
+              return {
+                ...party,
+                totalPurchases,
+                totalPayments,
+                transactionCount: entries.length
+              }
+            } catch (err) {
+              // If ledger fetch fails, use party data as is
+              console.error(`Error loading ledger for party ${party.id}:`, err)
+              return {
+                ...party,
+                totalPurchases: party.totalPurchases || 0,
+                totalPayments: party.totalPayments || 0,
+                transactionCount: party.transactionCount || 0
+              }
+            }
+          })
+          
+          mappedParties = await Promise.all(ledgerPromises)
+        } catch (err) {
+          console.error('Error loading party ledgers:', err)
+          // Continue with parties data as is if ledger loading fails
+        }
 
         // Combine expenses and income into transactions
         setTransactions([...mappedExpenses, ...mappedIncome])
         setCredits(mappedCredits)
         setNotes(Array.isArray(notesData) ? notesData : [])
+        setParties(mappedParties)
+        
+        // If a party is selected, reload its ledger
+        if (selectedParty) {
+          try {
+            const ledgerData = await partiesAPI.getLedger(selectedParty.id)
+            // Map API response to UI format
+            const mappedEntries = Array.isArray(ledgerData) 
+              ? ledgerData.map(entry => ({
+                  ...entry,
+                  type: entry.transactionType?.toLowerCase() || entry.type,
+                  date: entry.transactionDate || entry.date
+                }))
+              : []
+            setLedgerEntries(mappedEntries)
+          } catch (err) {
+            console.error('Error loading ledger:', err)
+            // Don't show error toast on initial load, just set empty array
+            setLedgerEntries([])
+          }
+        }
       } catch (err) {
         console.error('Error loading data:', err)
         setError('Failed to load data. Please check if the API server is running.')
@@ -262,6 +359,310 @@ function App() {
   const handleNoteModalClose = () => {
     setIsNoteModalOpen(false)
     setEditNote(null)
+  }
+
+  // Party handlers
+  const handleAddPartyClick = () => {
+    setEditParty(null)
+    setIsPartyModalOpen(true)
+  }
+
+  const handleEditPartyClick = (party) => {
+    setEditParty(party)
+    setIsPartyModalOpen(true)
+  }
+
+  const handlePartyModalClose = () => {
+    setIsPartyModalOpen(false)
+    setEditParty(null)
+  }
+
+  const handlePartyFormSubmit = async (formData) => {
+    setIsLoading(true)
+    try {
+      // Map UI format to API format
+      const apiData = {
+        name: formData.name,
+        phone: formData.contact || undefined,
+        notes: formData.notes || undefined,
+        openingBalance: formData.openingBalance || 0.00
+      }
+      
+      if (editParty) {
+        // Update party
+        const updatedParty = await partiesAPI.update(editParty.id, apiData)
+        // Map API response back to UI format
+        const mappedParty = {
+          ...updatedParty,
+          contact: updatedParty.phone || updatedParty.contact
+        }
+        setParties(prev => prev.map(p => p.id === editParty.id ? mappedParty : p))
+        showToast('Party updated successfully!', 'success')
+      } else {
+        // Create party
+        const newParty = await partiesAPI.create(apiData)
+        // Map API response back to UI format
+        const mappedParty = {
+          ...newParty,
+          contact: newParty.phone || newParty.contact
+        }
+        setParties(prev => [mappedParty, ...prev])
+        showToast('Party added successfully!', 'success')
+      }
+      handlePartyModalClose()
+    } catch (err) {
+      console.error('Error saving party:', err)
+      showToast('Failed to save party. Please check if the API server is running.', 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDeleteParty = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this party? All ledger entries will also be deleted.')) {
+      return
+    }
+    setIsLoading(true)
+    try {
+      await partiesAPI.delete(id)
+      setParties(prev => prev.filter(p => p.id !== id))
+      if (selectedParty && selectedParty.id === id) {
+        setSelectedParty(null)
+        setLedgerEntries([])
+      }
+      showToast('Party deleted successfully!', 'success')
+    } catch (err) {
+      console.error('Error deleting party:', err)
+      showToast('Failed to delete party', 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handlePartyClick = async (party) => {
+    setSelectedParty(party)
+    setIsPartyDetailsModalOpen(true)
+    setIsLoading(true)
+    try {
+      const ledgerData = await partiesAPI.getLedger(party.id)
+      // Map API response to UI format
+      const mappedEntries = Array.isArray(ledgerData)
+        ? ledgerData.map(entry => ({
+            ...entry,
+            type: entry.transactionType?.toLowerCase() || entry.type,
+            date: entry.transactionDate || entry.date
+          }))
+        : []
+      setLedgerEntries(mappedEntries)
+    } catch (err) {
+      console.error('Error loading ledger:', err)
+      setLedgerEntries([])
+      // Check if it's a 404 (endpoint not found) - backend might not be ready yet
+      if (err.message && err.message.includes('not found')) {
+        showToast('Ledger endpoint not available yet. Backend needs to be implemented.', 'error')
+      } else {
+        showToast('Failed to load ledger: ' + (err.message || 'Unknown error'), 'error')
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handlePartyDetailsModalClose = () => {
+    setIsPartyDetailsModalOpen(false)
+    setSelectedParty(null)
+    setLedgerEntries([])
+  }
+
+  const handleAddPaymentFromModal = () => {
+    setLedgerEntryType('payment')
+    setIsLedgerEntryModalOpen(true)
+  }
+
+  const handleAddLedgerEntryClick = () => {
+    setEditLedgerEntry(null)
+    setLedgerEntryType('payment')
+    setIsLedgerEntryModalOpen(true)
+  }
+
+  const handleEditLedgerEntryClick = (entry) => {
+    setEditLedgerEntry(entry)
+    setIsLedgerEntryModalOpen(true)
+  }
+
+  const handleLedgerEntryModalClose = () => {
+    setIsLedgerEntryModalOpen(false)
+    setEditLedgerEntry(null)
+  }
+
+  const handleLedgerEntryFormSubmit = async (formData) => {
+    if (!selectedParty) return
+    setIsLoading(true)
+    try {
+      if (editLedgerEntry) {
+        // Update ledger entry
+        const updatedEntry = await ledgerAPI.update(editLedgerEntry.id, formData)
+        // Map API response back to UI format
+        const mappedEntry = {
+          ...updatedEntry,
+          type: updatedEntry.transactionType?.toLowerCase() || updatedEntry.type,
+          date: updatedEntry.transactionDate || updatedEntry.date
+        }
+        setLedgerEntries(prev => prev.map(e => e.id === editLedgerEntry.id ? mappedEntry : e))
+        showToast('Ledger entry updated successfully!', 'success')
+      } else {
+        // Create ledger entry
+        const newEntry = await ledgerAPI.create(selectedParty.id, formData)
+        // Map API response back to UI format
+        const mappedEntry = {
+          ...newEntry,
+          type: newEntry.transactionType?.toLowerCase() || newEntry.type,
+          date: newEntry.transactionDate || newEntry.date
+        }
+        setLedgerEntries(prev => [mappedEntry, ...prev])
+        showToast('Ledger entry added successfully!', 'success')
+      }
+      
+      // Reload party and ledger to update totals
+      const updatedParty = await partiesAPI.getById(selectedParty.id)
+      
+      // Reload ledger entries and calculate totals
+      try {
+        const ledgerData = await partiesAPI.getLedger(selectedParty.id)
+        const mappedEntries = Array.isArray(ledgerData)
+          ? ledgerData.map(entry => ({
+              ...entry,
+              type: entry.transactionType?.toLowerCase() || entry.type,
+              date: entry.transactionDate || entry.date
+            }))
+          : []
+        setLedgerEntries(mappedEntries)
+        
+        // Calculate totals from ledger entries
+        let totalPurchases = 0
+        let totalPayments = 0
+        
+        mappedEntries.forEach(entry => {
+          const type = entry.transactionType?.toUpperCase() || entry.type?.toUpperCase()
+          const amount = entry.amount || 0
+          
+          if (type === 'PURCHASE') {
+            totalPurchases += amount
+          } else if (type === 'PAYMENT') {
+            totalPayments += amount
+          } else if (type === 'ADJUSTMENT') {
+            if (amount > 0) {
+              totalPurchases += amount
+            } else {
+              totalPayments += Math.abs(amount)
+            }
+          }
+        })
+        
+        // Map API response back to UI format with calculated totals
+        const mappedParty = {
+          ...updatedParty,
+          contact: updatedParty.phone || updatedParty.contact,
+          totalPurchases,
+          totalPayments,
+          transactionCount: mappedEntries.length
+        }
+        setParties(prev => prev.map(p => p.id === selectedParty.id ? mappedParty : p))
+        setSelectedParty(mappedParty)
+      } catch (err) {
+        console.error('Error reloading ledger:', err)
+        // Map API response back to UI format without totals
+        const mappedParty = {
+          ...updatedParty,
+          contact: updatedParty.phone || updatedParty.contact
+        }
+        setParties(prev => prev.map(p => p.id === selectedParty.id ? mappedParty : p))
+        setSelectedParty(mappedParty)
+      }
+      
+      handleLedgerEntryModalClose()
+    } catch (err) {
+      console.error('Error saving ledger entry:', err)
+      showToast('Failed to save ledger entry. Please check if the API server is running.', 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDeleteLedgerEntry = async (entryId) => {
+    if (!selectedParty) return
+    if (!window.confirm('Are you sure you want to delete this ledger entry?')) {
+      return
+    }
+    setIsLoading(true)
+    try {
+      await ledgerAPI.delete(entryId)
+      setLedgerEntries(prev => prev.filter(e => e.id !== entryId))
+      
+      // Reload party and ledger to update totals
+      const updatedParty = await partiesAPI.getById(selectedParty.id)
+      
+      // Reload ledger entries and calculate totals
+      try {
+        const ledgerData = await partiesAPI.getLedger(selectedParty.id)
+        const mappedEntries = Array.isArray(ledgerData)
+          ? ledgerData.map(entry => ({
+              ...entry,
+              type: entry.transactionType?.toLowerCase() || entry.type,
+              date: entry.transactionDate || entry.date
+            }))
+          : []
+        setLedgerEntries(mappedEntries)
+        
+        // Calculate totals from ledger entries
+        let totalPurchases = 0
+        let totalPayments = 0
+        
+        mappedEntries.forEach(entry => {
+          const type = entry.transactionType?.toUpperCase() || entry.type?.toUpperCase()
+          const amount = entry.amount || 0
+          
+          if (type === 'PURCHASE') {
+            totalPurchases += amount
+          } else if (type === 'PAYMENT') {
+            totalPayments += amount
+          } else if (type === 'ADJUSTMENT') {
+            if (amount > 0) {
+              totalPurchases += amount
+            } else {
+              totalPayments += Math.abs(amount)
+            }
+          }
+        })
+        
+        // Map API response back to UI format with calculated totals
+        const mappedParty = {
+          ...updatedParty,
+          contact: updatedParty.phone || updatedParty.contact,
+          totalPurchases,
+          totalPayments,
+          transactionCount: mappedEntries.length
+        }
+        setParties(prev => prev.map(p => p.id === selectedParty.id ? mappedParty : p))
+        setSelectedParty(mappedParty)
+      } catch (err) {
+        console.error('Error reloading ledger:', err)
+        // Map API response back to UI format without totals
+        const mappedParty = {
+          ...updatedParty,
+          contact: updatedParty.phone || updatedParty.contact
+        }
+        setParties(prev => prev.map(p => p.id === selectedParty.id ? mappedParty : p))
+        setSelectedParty(mappedParty)
+      }
+      
+      showToast('Ledger entry deleted successfully!', 'success')
+    } catch (err) {
+      console.error('Error deleting ledger entry:', err)
+      showToast('Failed to delete ledger entry', 'error')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleDeleteTransaction = async (id) => {
@@ -494,6 +895,23 @@ function App() {
 
   const filteredTransactions = filterTransactions(currentTransactions)
 
+  // Filter parties based on search query
+  const filterParties = (partiesList) => {
+    if (!searchQuery.trim()) {
+      return partiesList
+    }
+    
+    const query = searchQuery.toLowerCase()
+    return partiesList.filter(party => 
+      party.name?.toLowerCase().includes(query) ||
+      party.contact?.toLowerCase().includes(query) ||
+      party.phone?.toLowerCase().includes(query) ||
+      party.notes?.toLowerCase().includes(query)
+    )
+  }
+
+  const filteredParties = filterParties(parties)
+
   // Quick date filter handler
   const handleQuickDateFilter = (filterType) => {
     const today = new Date()
@@ -711,7 +1129,17 @@ function App() {
     <div className="app-container">
       <Header darkMode={darkMode} onToggleDarkMode={() => setDarkMode(!darkMode)} user={user} onLogout={handleLogout} />
       <div className="content-section">
-        <ToggleSwitch viewMode={viewMode} setViewMode={setViewMode} />
+        <BurgerMenu viewMode={viewMode} setViewMode={setViewMode} />
+        
+        {viewMode === 'dashboard' && (
+          <Dashboard
+            transactions={transactions}
+            credits={credits}
+            parties={parties}
+            notes={notes}
+            onNavigate={setViewMode}
+          />
+        )}
         
         {viewMode === 'expenses' && (
           <StatisticsCards transactions={transactions} viewMode={viewMode} />
@@ -730,7 +1158,7 @@ function App() {
           />
         )}
         
-        {viewMode !== 'credits' && viewMode !== 'notes' && (
+        {viewMode !== 'dashboard' && viewMode !== 'credits' && viewMode !== 'notes' && viewMode !== 'parties' && (
           <SearchBar
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
@@ -772,13 +1200,34 @@ function App() {
           />
         )}
 
-        {viewMode !== 'credits' && viewMode !== 'notes' && filteredTransactions.length > 0 && (
+        {viewMode === 'parties' && (
+          <SearchBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onDateRangeChange={setDateRange}
+            dateRange={dateRange}
+            onExportCSV={handleExportCSV}
+            onToggleSummary={() => setShowMonthlySummary(!showMonthlySummary)}
+            showSummary={showMonthlySummary}
+            selectedCategory=""
+            onCategoryChange={() => {}}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+            onClearFilters={handleClearFilters}
+            categories={[]}
+            viewMode={viewMode}
+            onQuickDateFilter={handleQuickDateFilter}
+            isLoading={isLoading}
+          />
+        )}
+
+        {viewMode !== 'dashboard' && viewMode !== 'credits' && viewMode !== 'notes' && filteredTransactions.length > 0 && (
           <div className="transaction-count-badge">
             Showing {filteredTransactions.length} {viewMode === 'expenses' ? 'expenses' : 'income entries'}
           </div>
         )}
 
-        {viewMode !== 'credits' && viewMode !== 'notes' && showMonthlySummary && (
+        {viewMode !== 'dashboard' && viewMode !== 'credits' && viewMode !== 'notes' && showMonthlySummary && (
           <>
             <MonthlySummary 
               transactions={transactions} 
@@ -805,7 +1254,22 @@ function App() {
             onEdit={handleEditNoteClick}
             onDelete={handleDeleteNote}
           />
-        ) : (
+        ) : viewMode === 'parties' ? (
+          <>
+            {filteredParties.length > 0 && searchQuery.trim() && (
+              <div className="transaction-count-badge">
+                Showing {filteredParties.length} {filteredParties.length === 1 ? 'party' : 'parties'}
+              </div>
+            )}
+            <PartyList
+              parties={filteredParties}
+              onAddClick={handleAddPartyClick}
+              onPartyClick={handlePartyClick}
+              onEdit={handleEditPartyClick}
+              onDelete={handleDeleteParty}
+            />
+          </>
+        ) : viewMode !== 'dashboard' ? (
           <TransactionList 
             transactions={filteredTransactions} 
             viewMode={viewMode}
@@ -813,7 +1277,7 @@ function App() {
             onEdit={handleEditClick}
             onDelete={handleDeleteTransaction}
           />
-        )}
+        ) : null}
       </div>
       <AddExpenseModal
         isOpen={isModalOpen}
@@ -827,6 +1291,29 @@ function App() {
         onClose={handleNoteModalClose}
         onSubmit={handleNoteFormSubmit}
         editNote={editNote}
+      />
+      <AddPartyModal
+        isOpen={isPartyModalOpen}
+        onClose={handlePartyModalClose}
+        onSubmit={handlePartyFormSubmit}
+        editParty={editParty}
+      />
+      <PartyDetailsModal
+        isOpen={isPartyDetailsModalOpen}
+        onClose={handlePartyDetailsModalClose}
+        party={selectedParty}
+        ledgerEntries={ledgerEntries}
+        onAddPayment={handleAddPaymentFromModal}
+        onEditEntry={handleEditLedgerEntryClick}
+        onDeleteEntry={handleDeleteLedgerEntry}
+      />
+      <AddLedgerEntryModal
+        isOpen={isLedgerEntryModalOpen}
+        onClose={handleLedgerEntryModalClose}
+        onSubmit={handleLedgerEntryFormSubmit}
+        party={selectedParty}
+        editEntry={editLedgerEntry}
+        defaultType={ledgerEntryType}
       />
       <Toast
         isVisible={toast.isVisible}

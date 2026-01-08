@@ -45,7 +45,7 @@ function SearchBar({
         <div className="search-input-wrapper">
           <input
             type="text"
-            placeholder="Search transactions... (Ctrl+K)"
+            placeholder={viewMode === 'parties' ? "Search parties by name, phone, or notes... (Ctrl+K)" : "Search transactions... (Ctrl+K)"}
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
             className="search-input"

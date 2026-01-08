@@ -1,31 +1,32 @@
 // API Configuration
-// Use environment variable or detect the current host
+// Automatically detects API URL based on environment
 const getApiBaseUrl = () => {
-  // Priority 1: Environment variable (for local dev connecting to production)
+  // Priority 1: Environment variable (explicit override)
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
   
-  // Check if we're in a browser environment
+  // Priority 2: Auto-detect based on current hostname
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
-    const protocol = window.location.protocol; // Will be 'https:' or 'http:'
+    const protocol = window.location.protocol; // 'https:' or 'http:'
     const port = window.location.port;
     
-    // If accessing from a public IP or domain, use same protocol/host but /api path
-    // This assumes nginx/apache is proxying /api to backend:8080
-    if (host !== 'localhost' && host !== '127.0.0.1') {
-      // Use same protocol (http/https) and domain WITHOUT port 8080
+    // Production: Use same protocol and hostname (nginx handles /api routing)
+    // Works for: www.trackmyexpenses.in, trackmyexpenses.in, or any production domain
+    if (host !== 'localhost' && host !== '127.0.0.1' && host !== '0.0.0.0') {
+      // For production domains, use same protocol and hostname
+      // Nginx/Apache should proxy /api/* to backend
       // Only include port if it's a non-standard port (not 80/443)
-      // NEVER use port 8080 for production domains - nginx handles routing
       if (port && port !== '80' && port !== '443' && port !== '8080') {
         return `${protocol}//${host}:${port}/api`;
       }
-      // Use same protocol as the page (https if page is https, http if page is http)
+      // Standard ports (80/443) - no port in URL
       return `${protocol}//${host}/api`;
     }
   }
-  // Default to localhost for local development
+  
+  // Priority 3: Default to localhost for local development
   return 'http://localhost:8080/api';
 };
 
@@ -61,10 +62,24 @@ const apiCall = async (endpoint, options = {}) => {
       ...options,
     });
 
+    // Handle 404 Not Found - endpoint might not exist yet (for new features)
+    if (response.status === 404) {
+      const text = await response.text();
+      let errorMessage = 'Endpoint not found. The backend might not have this feature yet.';
+      try {
+        const data = JSON.parse(text);
+        errorMessage = data.error || data.message || errorMessage;
+      } catch (e) {
+        // If parsing fails, use default message
+      }
+      throw new Error(errorMessage);
+    }
+
     // Handle 403 Forbidden - authentication issue
+    // Only auto-logout for critical auth endpoints, not for feature endpoints that might not exist
     if (response.status === 403) {
       const text = await response.text();
-      let errorMessage = 'Access denied. Please login again.';
+      let errorMessage = 'Access denied.';
       try {
         const data = JSON.parse(text);
         errorMessage = data.error || errorMessage;
@@ -72,8 +87,11 @@ const apiCall = async (endpoint, options = {}) => {
         // If parsing fails, use default message
       }
       
-      // Clear invalid token
-      if (token) {
+      // Only auto-logout for critical auth endpoints (like /auth/me)
+      // For other endpoints, just throw error without logging out
+      const isAuthEndpoint = endpoint.includes('/auth/me') || endpoint.includes('/auth/login');
+      
+      if (isAuthEndpoint && token) {
         localStorage.removeItem('authToken');
         // Reload page to redirect to login
         if (typeof window !== 'undefined') {
@@ -255,6 +273,128 @@ export const notesAPI = {
   // Delete note
   delete: async (id) => {
     return apiCall(`/notes/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// ==================== PARTIES API ====================
+
+export const partiesAPI = {
+  // Get all parties
+  getAll: async () => {
+    return apiCall('/parties');
+  },
+
+  // Get single party by ID
+  getById: async (id) => {
+    return apiCall(`/parties/${id}`);
+  },
+
+  // Search parties
+  search: async (query) => {
+    return apiCall(`/parties/search?q=${encodeURIComponent(query)}`);
+  },
+
+  // Create new party
+  create: async (partyData) => {
+    // Map UI format to API format
+    const apiData = {
+      name: partyData.name,
+      phone: partyData.contact || partyData.phone || undefined,
+      notes: partyData.notes || undefined,
+      openingBalance: partyData.openingBalance || 0.00
+    };
+    return apiCall('/parties', {
+      method: 'POST',
+      body: JSON.stringify(apiData),
+    });
+  },
+
+  // Update party
+  update: async (id, partyData) => {
+    // Map UI format to API format
+    const apiData = {
+      name: partyData.name,
+      phone: partyData.contact || partyData.phone || undefined,
+      notes: partyData.notes || undefined,
+      openingBalance: partyData.openingBalance !== undefined ? partyData.openingBalance : undefined
+    };
+    return apiCall(`/parties/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(apiData),
+    });
+  },
+
+  // Delete party
+  delete: async (id) => {
+    return apiCall(`/parties/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Get party ledger entries
+  getLedger: async (partyId) => {
+    return apiCall(`/ledger/parties/${partyId}/entries`);
+  },
+
+  // Get party summary
+  getSummary: async (partyId) => {
+    return apiCall(`/ledger/parties/${partyId}/summary`);
+  },
+
+  // Get party outstanding balance
+  getOutstanding: async (partyId) => {
+    return apiCall(`/ledger/parties/${partyId}/outstanding`);
+  },
+};
+
+// ==================== LEDGER ENTRIES API ====================
+
+export const ledgerAPI = {
+  // Get single ledger entry by ID
+  getById: async (entryId) => {
+    return apiCall(`/ledger/entries/${entryId}`);
+  },
+
+  // Add ledger entry (purchase, payment, adjustment)
+  create: async (partyId, entryData) => {
+    // Map UI format to API format
+    const apiData = {
+      party: { id: partyId },
+      transactionType: entryData.type?.toUpperCase() || 'PURCHASE',
+      amount: entryData.amount,
+      transactionDate: entryData.date,
+      description: entryData.description || undefined,
+      referenceNumber: entryData.reference || entryData.referenceNumber || undefined,
+      paymentMode: entryData.paymentMode || undefined
+    };
+    return apiCall('/ledger/entries', {
+      method: 'POST',
+      body: JSON.stringify(apiData),
+    });
+  },
+
+  // Update ledger entry
+  update: async (entryId, entryData) => {
+    // Map UI format to API format
+    const apiData = {
+      amount: entryData.amount !== undefined ? entryData.amount : undefined,
+      transactionDate: entryData.date || undefined,
+      description: entryData.description || undefined,
+      referenceNumber: entryData.reference || undefined
+    };
+    // Remove undefined fields
+    Object.keys(apiData).forEach(key => apiData[key] === undefined && delete apiData[key]);
+    return apiCall(`/ledger/entries/${entryId}`, {
+      method: 'PUT',
+      body: JSON.stringify(apiData),
+    });
+  },
+
+  // Delete ledger entry
+  delete: async (entryId) => {
+    return apiCall(`/ledger/entries/${entryId}`, {
       method: 'DELETE',
     });
   },

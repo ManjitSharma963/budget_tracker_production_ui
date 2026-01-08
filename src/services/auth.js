@@ -1,31 +1,32 @@
 // API Configuration
-// Use environment variable or detect the current host
+// Automatically detects API URL based on environment
 const getApiBaseUrl = () => {
-  // Priority 1: Environment variable (for local dev connecting to production)
+  // Priority 1: Environment variable (explicit override)
   if (import.meta.env.VITE_API_URL) {
     return import.meta.env.VITE_API_URL;
   }
   
-  // Check if we're in a browser environment
+  // Priority 2: Auto-detect based on current hostname
   if (typeof window !== 'undefined') {
     const host = window.location.hostname;
-    const protocol = window.location.protocol; // Will be 'https:' or 'http:'
+    const protocol = window.location.protocol; // 'https:' or 'http:'
     const port = window.location.port;
     
-    // If accessing from a public IP or domain, use same protocol/host but /api path
-    // This assumes nginx/apache is proxying /api to backend:8080
-    if (host !== 'localhost' && host !== '127.0.0.1') {
-      // Use same protocol (http/https) and domain WITHOUT port 8080
+    // Production: Use same protocol and hostname (nginx handles /api routing)
+    // Works for: www.trackmyexpenses.in, trackmyexpenses.in, or any production domain
+    if (host !== 'localhost' && host !== '127.0.0.1' && host !== '0.0.0.0') {
+      // For production domains, use same protocol and hostname
+      // Nginx/Apache should proxy /api/* to backend
       // Only include port if it's a non-standard port (not 80/443)
-      // NEVER use port 8080 for production domains - nginx handles routing
       if (port && port !== '80' && port !== '443' && port !== '8080') {
         return `${protocol}//${host}:${port}/api`;
       }
-      // Use same protocol as the page (https if page is https, http if page is http)
+      // Standard ports (80/443) - no port in URL
       return `${protocol}//${host}/api`;
     }
   }
-  // Default to localhost for local development
+  
+  // Priority 3: Default to localhost for local development
   return 'http://localhost:8080/api';
 };
 

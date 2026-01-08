@@ -5,6 +5,12 @@ function ToggleSwitch({ viewMode, setViewMode }) {
   return (
     <div className="toggle-container">
       <button
+        className={`toggle-option ${viewMode === 'dashboard' ? 'active' : ''}`}
+        onClick={() => setViewMode('dashboard')}
+      >
+        Dashboard
+      </button>
+      <button
         className={`toggle-option ${viewMode === 'expenses' ? 'active' : ''}`}
         onClick={() => setViewMode('expenses')}
       >
@@ -27,6 +33,12 @@ function ToggleSwitch({ viewMode, setViewMode }) {
         onClick={() => setViewMode('notes')}
       >
         Notes
+      </button>
+      <button
+        className={`toggle-option ${viewMode === 'parties' ? 'active' : ''}`}
+        onClick={() => setViewMode('parties')}
+      >
+        Parties
       </button>
     </div>
   )
