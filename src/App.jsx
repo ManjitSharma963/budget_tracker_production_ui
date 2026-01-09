@@ -8,6 +8,7 @@ import TransactionList from './components/TransactionList'
 import CreditsList from './components/CreditsList'
 import NotesList from './components/NotesList'
 import PartyList from './components/PartyList'
+import PartyLedger from './components/PartyLedger'
 import PartyDetailsModal from './components/PartyDetailsModal'
 import Dashboard from './components/Dashboard'
 import AddExpenseModal from './components/AddExpenseModal'
@@ -49,7 +50,8 @@ function App() {
   const [isLedgerEntryModalOpen, setIsLedgerEntryModalOpen] = useState(false)
   const [editParty, setEditParty] = useState(null)
   const [editLedgerEntry, setEditLedgerEntry] = useState(null)
-  const [ledgerEntryType, setLedgerEntryType] = useState('payment') // Default to payment
+  const [ledgerEntryType, setLedgerEntryType] = useState('purchase') // Default to purchase
+  const [showPartyLedger, setShowPartyLedger] = useState(false) // Track if showing party ledger view
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -441,7 +443,7 @@ function App() {
 
   const handlePartyClick = async (party) => {
     setSelectedParty(party)
-    setIsPartyDetailsModalOpen(true)
+    setShowPartyLedger(true)
     setIsLoading(true)
     try {
       const ledgerData = await partiesAPI.getLedger(party.id)
@@ -474,6 +476,12 @@ function App() {
     setLedgerEntries([])
   }
 
+  const handlePartyLedgerBack = () => {
+    setShowPartyLedger(false)
+    setSelectedParty(null)
+    setLedgerEntries([])
+  }
+
   const handleAddPaymentFromModal = () => {
     setLedgerEntryType('payment')
     setIsLedgerEntryModalOpen(true)
@@ -481,7 +489,7 @@ function App() {
 
   const handleAddLedgerEntryClick = () => {
     setEditLedgerEntry(null)
-    setLedgerEntryType('payment')
+    setLedgerEntryType('purchase') // Default to purchase for new entries
     setIsLedgerEntryModalOpen(true)
   }
 
@@ -1253,6 +1261,15 @@ function App() {
             onAddClick={handleAddNoteClick}
             onEdit={handleEditNoteClick}
             onDelete={handleDeleteNote}
+          />
+        ) : showPartyLedger && selectedParty ? (
+          <PartyLedger
+            party={selectedParty}
+            ledgerEntries={ledgerEntries}
+            onBack={handlePartyLedgerBack}
+            onAddEntry={handleAddLedgerEntryClick}
+            onEditEntry={handleEditLedgerEntryClick}
+            onDeleteEntry={handleDeleteLedgerEntry}
           />
         ) : viewMode === 'parties' ? (
           <>

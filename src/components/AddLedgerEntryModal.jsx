@@ -89,8 +89,7 @@ function AddLedgerEntryModal({ isOpen, onClose, onSubmit, party, editEntry = nul
       type: isPaymentMode ? 'payment' : formData.type,
       paymentMode: isPaymentMode ? formData.paymentMode : undefined,
       amount: parseFloat(formData.amount),
-      description: formData.description.trim() || undefined,
-      reference: formData.reference.trim() || undefined
+      description: formData.description.trim() || undefined
     }
 
     onSubmit(submitData)
@@ -199,21 +198,6 @@ function AddLedgerEntryModal({ isOpen, onClose, onSubmit, party, editEntry = nul
               rows="3"
             />
           </div>
-
-          {!isPaymentMode && (
-            <div className="form-group">
-              <label htmlFor="reference">Reference Number</label>
-              <input
-                type="text"
-                id="reference"
-                name="reference"
-                value={formData.reference}
-                onChange={handleChange}
-                placeholder="Invoice number, receipt number, etc."
-                autoComplete="off"
-              />
-            </div>
-          )}
 
           <div className="modal-footer">
             <button type="button" className="cancel-button" onClick={onClose}>

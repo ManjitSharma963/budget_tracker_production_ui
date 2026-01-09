@@ -1,8 +1,10 @@
-import React from 'react'
+import React, { useState, useMemo } from 'react'
 import AddButton from './AddButton'
 import './PartyLedger.css'
 
 function PartyLedger({ party, ledgerEntries, onBack, onAddEntry, onEditEntry, onDeleteEntry }) {
+  const [filterType, setFilterType] = useState('all') // 'all', 'credit', 'debit'
+
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-GB', {
       day: 'numeric',
@@ -15,15 +17,25 @@ function PartyLedger({ party, ledgerEntries, onBack, onAddEntry, onEditEntry, on
     return `₹${Math.abs(amount).toLocaleString()}`
   }
 
-  // Calculate running balance
-  const calculateRunningBalance = () => {
+  // Sort entries by date (oldest first for proper ledger view)
+  const sortedEntries = useMemo(() => {
+    return [...ledgerEntries].sort((a, b) => {
+      const dateA = new Date(a.date || a.transactionDate || 0)
+      const dateB = new Date(b.date || b.transactionDate || 0)
+      return dateA - dateB // Oldest first
+    })
+  }, [ledgerEntries])
+
+  // Calculate running balance for ALL entries first (for accurate balance calculation)
+  const entriesWithBalance = useMemo(() => {
     let runningBalance = party.openingBalance || 0
-    const entriesWithBalance = ledgerEntries.map(entry => {
-      if (entry.type === 'purchase') {
+    return sortedEntries.map(entry => {
+      const type = entry.type || entry.transactionType?.toLowerCase()
+      if (type === 'purchase') {
         runningBalance += entry.amount
-      } else if (entry.type === 'payment') {
+      } else if (type === 'payment') {
         runningBalance -= entry.amount
-      } else if (entry.type === 'adjustment') {
+      } else if (type === 'adjustment') {
         runningBalance += entry.amount // Adjustments can be positive or negative
       }
       return {
@@ -31,13 +43,30 @@ function PartyLedger({ party, ledgerEntries, onBack, onAddEntry, onEditEntry, on
         runningBalance: runningBalance
       }
     })
-    return entriesWithBalance
-  }
+  }, [sortedEntries, party.openingBalance])
 
-  const entriesWithBalance = calculateRunningBalance()
+  // Calculate current balance from all entries
   const currentBalance = entriesWithBalance.length > 0 
     ? entriesWithBalance[entriesWithBalance.length - 1].runningBalance 
     : (party.openingBalance || 0)
+
+  // Filter entries based on selected filter (after calculating balance)
+  const filteredEntries = useMemo(() => {
+    if (filterType === 'all') return entriesWithBalance
+    if (filterType === 'credit') {
+      return entriesWithBalance.filter(entry => {
+        const type = entry.type || entry.transactionType?.toLowerCase()
+        return type === 'purchase' || (type === 'adjustment' && entry.amount > 0)
+      })
+    }
+    if (filterType === 'debit') {
+      return entriesWithBalance.filter(entry => {
+        const type = entry.type || entry.transactionType?.toLowerCase()
+        return type === 'payment' || (type === 'adjustment' && entry.amount < 0)
+      })
+    }
+    return entriesWithBalance
+  }, [entriesWithBalance, filterType])
 
   const getEntryTypeLabel = (type) => {
     switch(type) {
@@ -99,7 +128,29 @@ function PartyLedger({ party, ledgerEntries, onBack, onAddEntry, onEditEntry, on
         </div>
       </div>
 
-      {entriesWithBalance.length > 0 ? (
+      {/* Filter Buttons */}
+      <div className="ledger-filters">
+        <button
+          className={`filter-btn ${filterType === 'all' ? 'active' : ''}`}
+          onClick={() => setFilterType('all')}
+        >
+          All Transactions
+        </button>
+        <button
+          className={`filter-btn ${filterType === 'credit' ? 'active' : ''}`}
+          onClick={() => setFilterType('credit')}
+        >
+          Credit (Purchases)
+        </button>
+        <button
+          className={`filter-btn ${filterType === 'debit' ? 'active' : ''}`}
+          onClick={() => setFilterType('debit')}
+        >
+          Debit (Payments)
+        </button>
+      </div>
+
+      {filteredEntries.length > 0 ? (
         <div className="ledger-table-container">
           <div className="ledger-table-header">
             <div className="ledger-col-date">Date</div>
@@ -111,25 +162,26 @@ function PartyLedger({ party, ledgerEntries, onBack, onAddEntry, onEditEntry, on
             <div className="ledger-col-actions">Actions</div>
           </div>
           <div className="ledger-table-body">
-            {entriesWithBalance.map((entry, index) => {
-              const isPurchase = entry.type === 'purchase'
-              const isPayment = entry.type === 'payment'
-              const isAdjustment = entry.type === 'adjustment'
+            {filteredEntries.map((entry, index) => {
+              const entryType = entry.type || entry.transactionType?.toLowerCase()
+              const isPurchase = entryType === 'purchase'
+              const isPayment = entryType === 'payment'
+              const isAdjustment = entryType === 'adjustment'
               
               return (
                 <div key={entry.id || index} className="ledger-table-row">
-                  <div className="ledger-col-date">{formatDate(entry.date)}</div>
-                  <div className={`ledger-col-type ${getEntryTypeClass(entry.type)}`}>
-                    {getEntryTypeLabel(entry.type)}
+                  <div className="ledger-col-date" data-label="Date">{formatDate(entry.date)}</div>
+                  <div className={`ledger-col-type ${getEntryTypeClass(entryType)}`} data-label="Type">
+                    {getEntryTypeLabel(entryType)}
                   </div>
-                  <div className="ledger-col-description">{entry.description || '-'}</div>
-                  <div className="ledger-col-debit">
-                    {isPurchase || (isAdjustment && entry.amount > 0) ? formatCurrency(entry.amount) : '-'}
-                  </div>
-                  <div className="ledger-col-credit">
+                  <div className="ledger-col-description" data-label="Description">{entry.description || '-'}</div>
+                  <div className="ledger-col-debit" data-label="Debit">
                     {isPayment || (isAdjustment && entry.amount < 0) ? formatCurrency(Math.abs(entry.amount)) : '-'}
                   </div>
-                  <div className={`ledger-col-balance ${getBalanceClass(entry.runningBalance)}`}>
+                  <div className="ledger-col-credit" data-label="Credit">
+                    {isPurchase || (isAdjustment && entry.amount > 0) ? formatCurrency(entry.amount) : '-'}
+                  </div>
+                  <div className={`ledger-col-balance ${getBalanceClass(entry.runningBalance)}`} data-label="Balance">
                     {formatCurrency(entry.runningBalance)}
                   </div>
                   <div className="ledger-col-actions">
@@ -151,6 +203,17 @@ function PartyLedger({ party, ledgerEntries, onBack, onAddEntry, onEditEntry, on
                 </div>
               )
             })}
+          </div>
+        </div>
+      ) : filterType !== 'all' ? (
+        <div className="empty-state">
+          <div className="empty-icon-large">🔍</div>
+          <div className="empty-text">No {filterType === 'credit' ? 'credit' : 'debit'} transactions found</div>
+          <div className="empty-hint">Try selecting a different filter or add a new entry</div>
+          <div className="empty-action">
+            <button className="filter-btn active" onClick={() => setFilterType('all')}>
+              Show All Transactions
+            </button>
           </div>
         </div>
       ) : (
