@@ -7,19 +7,23 @@ import PieChart from './components/PieChart'
 import TransactionList from './components/TransactionList'
 import CreditsList from './components/CreditsList'
 import NotesList from './components/NotesList'
+import TasksList from './components/TasksList'
 import PartyList from './components/PartyList'
 import PartyLedger from './components/PartyLedger'
 import PartyDetailsModal from './components/PartyDetailsModal'
 import Dashboard from './components/Dashboard'
 import AddExpenseModal from './components/AddExpenseModal'
 import AddNoteModal from './components/AddNoteModal'
+import AddTaskModal from './components/AddTaskModal'
 import AddPartyModal from './components/AddPartyModal'
 import AddLedgerEntryModal from './components/AddLedgerEntryModal'
+import BudgetModal from './components/BudgetModal'
+import BudgetList from './components/BudgetList'
 import SearchBar from './components/SearchBar'
 import MonthlySummary from './components/MonthlySummary'
 import StatisticsCards from './components/StatisticsCards'
 import Toast from './components/Toast'
-import { expensesAPI, incomeAPI, creditsAPI, notesAPI, partiesAPI, ledgerAPI } from './services/api'
+import { expensesAPI, incomeAPI, creditsAPI, notesAPI, partiesAPI, ledgerAPI, tasksAPI, budgetsAPI } from './services/api'
 import { mapExpenseFromAPI, mapExpenseToAPI, mapIncomeFromAPI, mapIncomeToAPI, mapCreditFromAPI, mapCreditToAPI } from './utils/dataMapper'
 import { exportTransactionsToCSV, exportCreditsToCSV } from './utils/csvExport'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
@@ -38,16 +42,23 @@ function App() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editTransaction, setEditTransaction] = useState(null)
   const [editNote, setEditNote] = useState(null)
+  const [editTask, setEditTask] = useState(null)
   const [transactions, setTransactions] = useState([])
   const [credits, setCredits] = useState([])
   const [notes, setNotes] = useState([])
+  const [tasks, setTasks] = useState([])
   const [parties, setParties] = useState([])
+  const [budgets, setBudgets] = useState([])
   const [selectedParty, setSelectedParty] = useState(null)
   const [ledgerEntries, setLedgerEntries] = useState([])
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false)
   const [isPartyModalOpen, setIsPartyModalOpen] = useState(false)
   const [isPartyDetailsModalOpen, setIsPartyDetailsModalOpen] = useState(false)
   const [isLedgerEntryModalOpen, setIsLedgerEntryModalOpen] = useState(false)
+  const [isBudgetModalOpen, setIsBudgetModalOpen] = useState(false)
+  const [editBudget, setEditBudget] = useState(null)
+  const [expensesViewTab, setExpensesViewTab] = useState('expenses') // 'expenses' or 'budgets'
   const [editParty, setEditParty] = useState(null)
   const [editLedgerEntry, setEditLedgerEntry] = useState(null)
   const [ledgerEntryType, setLedgerEntryType] = useState('purchase') // Default to purchase
@@ -98,13 +109,15 @@ function App() {
       setLoading(true)
       setError(null)
       try {
-        // Fetch expenses, income, credits, notes, and parties in parallel
-        const [expensesData, incomeData, creditsData, notesData, partiesData] = await Promise.all([
+        // Fetch expenses, income, credits, notes, tasks, parties, and budgets in parallel
+        const [expensesData, incomeData, creditsData, notesData, tasksData, partiesData, budgetsData] = await Promise.all([
           expensesAPI.getAll().catch(() => []),
           incomeAPI.getAll().catch(() => []),
           creditsAPI.getAll().catch(() => []),
           notesAPI.getAll().catch(() => []),
-          partiesAPI.getAll().catch(() => [])
+          tasksAPI.getAll().catch(() => []),
+          partiesAPI.getAll().catch(() => []),
+          budgetsAPI.getAll().catch(() => [])
         ])
 
         // Map API data to UI format
@@ -183,7 +196,27 @@ function App() {
         setTransactions([...mappedExpenses, ...mappedIncome])
         setCredits(mappedCredits)
         setNotes(Array.isArray(notesData) ? notesData : [])
+        
+        // Tasks: Use API data, or fallback to local storage (handled in API)
+        const tasksToSet = Array.isArray(tasksData) ? tasksData : []
+        setTasks(tasksToSet)
+        
+        // If no tasks from API, try loading from local storage
+        if (tasksToSet.length === 0) {
+          try {
+            const { getTasksFromStorage } = await import('./services/tasksStorage.js')
+            const localTasks = getTasksFromStorage()
+            if (localTasks.length > 0) {
+              setTasks(localTasks)
+              console.log('Loaded tasks from local storage:', localTasks.length)
+            }
+          } catch (err) {
+            console.error('Error loading tasks from storage:', err)
+          }
+        }
+        
         setParties(mappedParties)
+        setBudgets(Array.isArray(budgetsData) ? budgetsData : [])
         
         // If a party is selected, reload its ledger
         if (selectedParty) {
@@ -763,6 +796,173 @@ function App() {
     setIsNoteModalOpen(true)
   }
 
+  // Task handlers
+  const handleAddTaskClick = () => {
+    setEditTask(null)
+    setIsTaskModalOpen(true)
+  }
+
+  const handleEditTaskClick = (task) => {
+    setEditTask(task)
+    setIsTaskModalOpen(true)
+  }
+
+  const handleTaskModalClose = () => {
+    setIsTaskModalOpen(false)
+    setEditTask(null)
+  }
+
+  const handleTaskFormSubmit = async (formData) => {
+    setIsLoading(true)
+    try {
+      if (formData.id) {
+        // Update task
+        const updatedTask = await tasksAPI.update(formData.id, {
+          title: formData.title,
+          subtitle: formData.subtitle,
+          date: formData.date,
+          startTime: formData.startTime,
+          endTime: formData.endTime,
+          status: formData.status
+        })
+        setTasks(prev => prev.map(t => t.id === formData.id ? updatedTask : t))
+        showToast('Task updated successfully!', 'success')
+      } else {
+        // Create task
+        const newTask = await tasksAPI.create({
+          title: formData.title,
+          subtitle: formData.subtitle,
+          date: formData.date,
+          startTime: formData.startTime,
+          endTime: formData.endTime,
+          status: formData.status
+        })
+        setTasks(prev => [newTask, ...prev])
+        showToast('Task added successfully!', 'success')
+      }
+      setIsTaskModalOpen(false)
+      setEditTask(null)
+    } catch (err) {
+      console.error('Error saving task:', err)
+      // Show specific error message if it's a time conflict
+      const errorMessage = err.message || 'Failed to save task. Please try again.'
+      if (errorMessage.includes('Time slot conflict') || errorMessage.includes('conflicts with existing task')) {
+        showToast(errorMessage, 'error')
+      } else {
+        showToast('Failed to save task. Please try again.', 'error')
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleDeleteTask = async (id) => {
+    setIsLoading(true)
+    try {
+      await tasksAPI.delete(id)
+      setTasks(prev => prev.filter(t => t.id !== id))
+      showToast('Task deleted successfully!', 'success')
+    } catch (err) {
+      console.error('Error deleting task:', err)
+      showToast('Failed to delete task. Please try again.', 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleToggleTaskStatus = async (id, newStatus) => {
+    setIsLoading(true)
+    try {
+      const task = tasks.find(t => t.id === id)
+      if (!task) return
+
+      const updatedTask = await tasksAPI.update(id, {
+        ...task,
+        status: newStatus
+      })
+      setTasks(prev => prev.map(t => t.id === id ? updatedTask : t))
+      showToast(`Task marked as ${newStatus}!`, 'success')
+    } catch (err) {
+      console.error('Error updating task status:', err)
+      showToast('Failed to update task status. Please try again.', 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Budget handlers
+  const handleAddBudgetClick = () => {
+    setEditBudget(null)
+    setIsBudgetModalOpen(true)
+  }
+
+  const handleEditBudgetClick = (budget) => {
+    setEditBudget(budget)
+    setIsBudgetModalOpen(true)
+  }
+
+  const handleBudgetModalClose = () => {
+    setIsBudgetModalOpen(false)
+    setEditBudget(null)
+  }
+
+  const handleBudgetFormSubmit = async (budgetData) => {
+    // Check if user is authenticated
+    const token = getAuthToken()
+    if (!token || !isAuthenticated) {
+      showToast('Please login to manage budgets.', 'error')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const now = new Date()
+      const currentMonth = now.getMonth()
+      const currentYear = now.getFullYear()
+      const currentMonthIncome = income.filter(t => {
+        const date = new Date(t.date)
+        return date.getMonth() === currentMonth && date.getFullYear() === currentYear
+      }).reduce((sum, t) => sum + t.amount, 0)
+
+      if (budgetData.action === 'delete') {
+        await budgetsAPI.delete(budgetData.id)
+        setBudgets(prev => prev.filter(b => b.id !== budgetData.id))
+        showToast('Budget deleted successfully!', 'success')
+      } else if (budgetData.action === 'update') {
+        const { action, id, ...updateData } = budgetData
+        // Recalculate amount if percentage type
+        if (updateData.budgetType === 'percentage' && updateData.percentage && currentMonthIncome > 0) {
+          updateData.amount = (updateData.percentage / 100) * currentMonthIncome
+        }
+        const updatedBudget = await budgetsAPI.update(id, { ...updateData, monthlyIncome: currentMonthIncome })
+        setBudgets(prev => prev.map(b => b.id === id ? updatedBudget : b))
+        showToast('Budget updated successfully!', 'success')
+      } else {
+        // Create new budget
+        const createData = { ...budgetData }
+        delete createData.action
+        // Recalculate amount if percentage type
+        if (createData.budgetType === 'percentage' && createData.percentage && currentMonthIncome > 0) {
+          createData.amount = (createData.percentage / 100) * currentMonthIncome
+        }
+        const newBudget = await budgetsAPI.create({ ...createData, monthlyIncome: currentMonthIncome })
+        setBudgets(prev => [newBudget, ...prev])
+        showToast('Budget added successfully!', 'success')
+      }
+      handleBudgetModalClose()
+    } catch (err) {
+      console.error('Error saving budget:', err)
+      const errorMessage = err.message || 'Failed to save budget. Please try again.'
+      if (errorMessage.includes('Access denied') || errorMessage.includes('login')) {
+        showToast('Please login to manage budgets.', 'error')
+      } else {
+        showToast(errorMessage, 'error')
+      }
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   const handleFormSubmit = async (formData) => {
     setIsLoading(true)
     try {
@@ -1150,14 +1350,68 @@ function App() {
         )}
         
         {viewMode === 'expenses' && (
-          <StatisticsCards transactions={transactions} viewMode={viewMode} />
-        )}
+          <>
+            {/* Expenses View Tabs */}
+            <div className="expenses-tabs">
+              <button
+                className={`expenses-tab ${expensesViewTab === 'expenses' ? 'active' : ''}`}
+                onClick={() => setExpensesViewTab('expenses')}
+              >
+                Expenses
+              </button>
+              <button
+                className={`expenses-tab ${expensesViewTab === 'budgets' ? 'active' : ''}`}
+                onClick={() => setExpensesViewTab('budgets')}
+              >
+                Budgets
+              </button>
+            </div>
 
-        {viewMode === 'expenses' && (
-          <PieChart 
-            total={expenseTotal} 
-            data={expenseChartData}
-          />
+            {expensesViewTab === 'expenses' && (
+              <>
+                <StatisticsCards transactions={transactions} viewMode={viewMode} />
+                <PieChart 
+                  total={expenseTotal} 
+                  data={expenseChartData}
+                />
+              </>
+            )}
+
+            {expensesViewTab === 'budgets' && (
+              (() => {
+                const now = new Date()
+                const currentMonth = now.getMonth()
+                const currentYear = now.getFullYear()
+                const currentMonthIncome = income.filter(t => {
+                  const date = new Date(t.date)
+                  return date.getMonth() === currentMonth && date.getFullYear() === currentYear
+                }).reduce((sum, t) => sum + t.amount, 0)
+                
+                return (
+                  <BudgetList
+                    budgets={budgets}
+                    expenses={expenses}
+                    monthlyIncome={currentMonthIncome}
+                    onAddClick={handleAddBudgetClick}
+                    onEdit={handleEditBudgetClick}
+                    onDelete={async (id) => {
+                      setIsLoading(true)
+                      try {
+                        await budgetsAPI.delete(id)
+                        setBudgets(prev => prev.filter(b => b.id !== id))
+                        showToast('Budget deleted successfully!', 'success')
+                      } catch (err) {
+                        console.error('Error deleting budget:', err)
+                        showToast('Failed to delete budget', 'error')
+                      } finally {
+                        setIsLoading(false)
+                      }
+                    }}
+                  />
+                )
+              })()
+            )}
+          </>
         )}
         {viewMode === 'income' && (
           <PieChart 
@@ -1166,7 +1420,27 @@ function App() {
           />
         )}
         
-        {viewMode !== 'dashboard' && viewMode !== 'credits' && viewMode !== 'notes' && viewMode !== 'parties' && (
+        {viewMode === 'expenses' && expensesViewTab === 'expenses' && (
+          <SearchBar
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            onDateRangeChange={setDateRange}
+            dateRange={dateRange}
+            onExportCSV={handleExportCSV}
+            onToggleSummary={() => setShowMonthlySummary(!showMonthlySummary)}
+            showSummary={showMonthlySummary}
+            selectedCategory={selectedCategory}
+            onCategoryChange={setSelectedCategory}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+            onClearFilters={handleClearFilters}
+            categories={getUniqueCategories()}
+            viewMode={viewMode}
+            onQuickDateFilter={handleQuickDateFilter}
+            isLoading={isLoading}
+          />
+        )}
+        {viewMode === 'income' && (
           <SearchBar
             searchQuery={searchQuery}
             onSearchChange={setSearchQuery}
@@ -1229,13 +1503,18 @@ function App() {
           />
         )}
 
-        {viewMode !== 'dashboard' && viewMode !== 'credits' && viewMode !== 'notes' && filteredTransactions.length > 0 && (
+        {viewMode === 'expenses' && expensesViewTab === 'expenses' && filteredTransactions.length > 0 && (
           <div className="transaction-count-badge">
-            Showing {filteredTransactions.length} {viewMode === 'expenses' ? 'expenses' : 'income entries'}
+            Showing {filteredTransactions.length} expenses
+          </div>
+        )}
+        {viewMode === 'income' && filteredTransactions.length > 0 && (
+          <div className="transaction-count-badge">
+            Showing {filteredTransactions.length} income entries
           </div>
         )}
 
-        {viewMode !== 'dashboard' && viewMode !== 'credits' && viewMode !== 'notes' && showMonthlySummary && (
+        {viewMode === 'expenses' && expensesViewTab === 'expenses' && showMonthlySummary && (
           <>
             <MonthlySummary 
               transactions={transactions} 
@@ -1262,6 +1541,14 @@ function App() {
             onEdit={handleEditNoteClick}
             onDelete={handleDeleteNote}
           />
+        ) : viewMode === 'tasks' ? (
+          <TasksList 
+            tasks={tasks}
+            onAddClick={handleAddTaskClick}
+            onEdit={handleEditTaskClick}
+            onDelete={handleDeleteTask}
+            onToggleStatus={handleToggleTaskStatus}
+          />
         ) : showPartyLedger && selectedParty ? (
           <PartyLedger
             party={selectedParty}
@@ -1286,7 +1573,15 @@ function App() {
               onDelete={handleDeleteParty}
             />
           </>
-        ) : viewMode !== 'dashboard' ? (
+        ) : viewMode === 'expenses' && expensesViewTab === 'expenses' ? (
+          <TransactionList 
+            transactions={filteredTransactions} 
+            viewMode={viewMode}
+            onAddClick={handleAddClick}
+            onEdit={handleEditClick}
+            onDelete={handleDeleteTransaction}
+          />
+        ) : viewMode !== 'dashboard' && viewMode !== 'expenses' ? (
           <TransactionList 
             transactions={filteredTransactions} 
             viewMode={viewMode}
@@ -1308,6 +1603,13 @@ function App() {
         onClose={handleNoteModalClose}
         onSubmit={handleNoteFormSubmit}
         editNote={editNote}
+      />
+      <AddTaskModal
+        isOpen={isTaskModalOpen}
+        onClose={handleTaskModalClose}
+        onSubmit={handleTaskFormSubmit}
+        editTask={editTask}
+        existingTasks={tasks}
       />
       <AddPartyModal
         isOpen={isPartyModalOpen}
@@ -1331,6 +1633,22 @@ function App() {
         party={selectedParty}
         editEntry={editLedgerEntry}
         defaultType={ledgerEntryType}
+      />
+      <BudgetModal
+        isOpen={isBudgetModalOpen}
+        onClose={handleBudgetModalClose}
+        onSubmit={handleBudgetFormSubmit}
+        budgets={budgets}
+        monthlyIncome={(() => {
+          const now = new Date()
+          const currentMonth = now.getMonth()
+          const currentYear = now.getFullYear()
+          return income.filter(t => {
+            const date = new Date(t.date)
+            return date.getMonth() === currentMonth && date.getFullYear() === currentYear
+          }).reduce((sum, t) => sum + t.amount, 0)
+        })()}
+        editBudget={editBudget}
       />
       <Toast
         isVisible={toast.isVisible}

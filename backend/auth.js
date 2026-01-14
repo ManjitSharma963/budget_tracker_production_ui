@@ -140,12 +140,22 @@ export const authenticateToken = (req, res, next) => {
 
   if (!token) {
     console.log('❌ No token provided in request to:', req.method, req.path);
-    return res.status(403).json({ error: 'Access token required' });
+    return res.status(403).json({ error: 'Access token required. Please login first.' });
   }
 
   const user = getUserByToken(token);
   if (!user) {
     console.log('❌ Invalid token for request to:', req.method, req.path);
+    console.log('Token provided:', token ? `${token.substring(0, 10)}...` : 'none');
+    
+    // Check if there are any users in the system
+    initializeUsers();
+    const users = readUsers();
+    if (users.length === 0) {
+      console.log('⚠️ No users found in database. User needs to register first.');
+      return res.status(403).json({ error: 'No users found. Please register first.' });
+    }
+    
     return res.status(403).json({ error: 'Invalid or expired token. Please login again.' });
   }
 

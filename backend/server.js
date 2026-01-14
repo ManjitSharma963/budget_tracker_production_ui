@@ -77,7 +77,9 @@ const initializeDatabase = () => {
     expenses: [],
     income: [],
     credits: [],
-    notes: []
+    notes: [],
+    tasks: [],
+    budgets: []
   };
   
   const dataDir = path.dirname(dbPath);
@@ -97,7 +99,7 @@ const readDatabase = () => {
     return JSON.parse(data);
   } catch (error) {
     console.error('Error reading database:', error);
-    return { expenses: [], income: [], credits: [], notes: [] };
+    return { expenses: [], income: [], credits: [], notes: [], tasks: [], budgets: [] };
   }
 };
 
@@ -115,6 +117,51 @@ const writeDatabase = (data) => {
 // Get current timestamp in ISO format
 const getTimestamp = () => {
   return new Date().toISOString().replace('Z', '').replace(/\.\d{3}/, '');
+};
+
+// Check if two time ranges overlap
+const doTimeRangesOverlap = (start1, end1, start2, end2) => {
+  if (!start1 || !end1 || !start2 || !end2) return false;
+  
+  // Convert time strings (HH:MM) to minutes for comparison
+  const timeToMinutes = (timeStr) => {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 60 + minutes;
+  };
+  
+  const start1Min = timeToMinutes(start1);
+  const end1Min = timeToMinutes(end1);
+  const start2Min = timeToMinutes(start2);
+  const end2Min = timeToMinutes(end2);
+  
+  // Check if ranges overlap
+  // Two ranges overlap if: start1 < end2 && start2 < end1
+  return start1Min < end2Min && start2Min < end1Min;
+};
+
+// Check for time conflicts with existing tasks
+const checkTimeConflict = (tasks, date, startTime, endTime, excludeTaskId = null) => {
+  if (!startTime || !endTime) return null; // No conflict if no time specified
+  
+  // Filter tasks for the same date, excluding the task being updated
+  const sameDateTasks = tasks.filter(task => {
+    if (task.date !== date) return false;
+    if (excludeTaskId && task.id === excludeTaskId) return false;
+    if (!task.startTime || !task.endTime) return false; // Skip tasks without time
+    return true;
+  });
+  
+  // Check for overlaps
+  for (const task of sameDateTasks) {
+    if (doTimeRangesOverlap(startTime, endTime, task.startTime, task.endTime)) {
+      return {
+        conflictingTask: task,
+        message: `Time slot conflicts with existing task "${task.title}" (${task.startTime} - ${task.endTime})`
+      };
+    }
+  }
+  
+  return null;
 };
 
 // Initialize database on startup
@@ -786,6 +833,449 @@ app.delete('/api/notes/:id', authenticateToken, (req, res) => {
   } catch (error) {
     res.status(500).json({
       error: 'Error deleting note',
+      message: error.message
+    });
+  }
+});
+
+// ==================== TASKS ENDPOINTS ====================
+// All task endpoints require authentication
+
+// GET /api/tasks - Fetch all tasks
+app.get('/api/tasks', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    res.json(db.tasks || []);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error fetching tasks',
+      message: error.message
+    });
+  }
+});
+
+// GET /api/tasks/:id - Fetch single task
+app.get('/api/tasks/:id', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    if (!db.tasks) {
+      db.tasks = [];
+    }
+    const task = db.tasks.find(t => t.id === parseInt(req.params.id));
+    
+    if (!task) {
+      return res.status(404).json({
+        error: 'Task not found'
+      });
+    }
+    
+    res.json(task);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error fetching task',
+      message: error.message
+    });
+  }
+});
+
+// POST /api/tasks - Create new task
+app.post('/api/tasks', authenticateToken, (req, res) => {
+  try {
+    const { title, subtitle, date, startTime, endTime, status, exercises, nutrition, details } = req.body;
+    
+    if (!title || !date) {
+      return res.status(400).json({
+        error: 'Missing required fields: title, date'
+      });
+    }
+    
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(date)) {
+      return res.status(400).json({
+        error: 'Invalid date format. Expected YYYY-MM-DD'
+      });
+    }
+    
+    // Validate time format if provided (HH:MM)
+    if (startTime && !/^\d{2}:\d{2}$/.test(startTime)) {
+      return res.status(400).json({
+        error: 'Invalid startTime format. Expected HH:MM'
+      });
+    }
+    
+    if (endTime && !/^\d{2}:\d{2}$/.test(endTime)) {
+      return res.status(400).json({
+        error: 'Invalid endTime format. Expected HH:MM'
+      });
+    }
+    
+    // Validate status if provided
+    const validStatuses = ['pending', 'completed', 'running', 'rejected'];
+    const finalStatus = status && validStatuses.includes(status.toLowerCase()) 
+      ? status.toLowerCase() 
+      : 'pending';
+    
+    const db = readDatabase();
+    if (!db.tasks) {
+      db.tasks = [];
+    }
+    
+    // Check for time conflicts if both startTime and endTime are provided
+    if (startTime && endTime) {
+      const conflict = checkTimeConflict(db.tasks, date, startTime, endTime);
+      if (conflict) {
+        return res.status(409).json({
+          error: 'Time slot conflict',
+          message: conflict.message,
+          conflictingTask: {
+            id: conflict.conflictingTask.id,
+            title: conflict.conflictingTask.title,
+            startTime: conflict.conflictingTask.startTime,
+            endTime: conflict.conflictingTask.endTime
+          }
+        });
+      }
+    }
+    
+    const timestamp = getTimestamp();
+    
+    const newTask = {
+      id: db.tasks.length > 0 ? Math.max(...db.tasks.map(t => t.id)) + 1 : 1,
+      title,
+      subtitle: subtitle || '',
+      date,
+      startTime: startTime || null,
+      endTime: endTime || null,
+      status: finalStatus,
+      exercises: exercises || null,
+      nutrition: nutrition || null,
+      details: details || null,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    
+    db.tasks.push(newTask);
+    writeDatabase(db);
+    
+    res.status(201).json(newTask);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error creating task',
+      message: error.message
+    });
+  }
+});
+
+// PUT /api/tasks/:id - Update task
+app.put('/api/tasks/:id', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    if (!db.tasks) {
+      db.tasks = [];
+    }
+    
+    const index = db.tasks.findIndex(t => t.id === parseInt(req.params.id));
+    
+    if (index === -1) {
+      return res.status(404).json({
+        error: 'Task not found'
+      });
+    }
+    
+    const { title, subtitle, date, startTime, endTime, status, exercises, nutrition, details } = req.body;
+    
+    // Validate date format if provided
+    if (date !== undefined) {
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(date)) {
+        return res.status(400).json({
+          error: 'Invalid date format. Expected YYYY-MM-DD'
+        });
+      }
+    }
+    
+    // Validate time formats if provided
+    if (startTime !== undefined && !/^\d{2}:\d{2}$/.test(startTime)) {
+      return res.status(400).json({
+        error: 'Invalid startTime format. Expected HH:MM'
+      });
+    }
+    
+    if (endTime !== undefined && !/^\d{2}:\d{2}$/.test(endTime)) {
+      return res.status(400).json({
+        error: 'Invalid endTime format. Expected HH:MM'
+      });
+    }
+    
+    // Validate status if provided
+    let normalizedStatus = undefined;
+    if (status !== undefined) {
+      const validStatuses = ['pending', 'completed', 'running', 'rejected'];
+      if (validStatuses.includes(status.toLowerCase())) {
+        normalizedStatus = status.toLowerCase();
+      } else {
+        return res.status(400).json({
+          error: 'Invalid status. Must be one of: pending, completed, running, rejected'
+        });
+      }
+    }
+    
+    // Determine the final values for date, startTime, and endTime
+    const finalDate = date !== undefined ? date : db.tasks[index].date;
+    const finalStartTime = startTime !== undefined ? startTime : db.tasks[index].startTime;
+    const finalEndTime = endTime !== undefined ? endTime : db.tasks[index].endTime;
+    
+    // Check for time conflicts if both startTime and endTime are provided
+    if (finalStartTime && finalEndTime) {
+      const conflict = checkTimeConflict(db.tasks, finalDate, finalStartTime, finalEndTime, parseInt(req.params.id));
+      if (conflict) {
+        return res.status(409).json({
+          error: 'Time slot conflict',
+          message: conflict.message,
+          conflictingTask: {
+            id: conflict.conflictingTask.id,
+            title: conflict.conflictingTask.title,
+            startTime: conflict.conflictingTask.startTime,
+            endTime: conflict.conflictingTask.endTime
+          }
+        });
+      }
+    }
+    
+    const updatedTask = {
+      ...db.tasks[index],
+      ...(title !== undefined && { title }),
+      ...(subtitle !== undefined && { subtitle }),
+      ...(date !== undefined && { date }),
+      ...(startTime !== undefined && { startTime }),
+      ...(endTime !== undefined && { endTime }),
+      ...(normalizedStatus !== undefined && { status: normalizedStatus }),
+      ...(exercises !== undefined && { exercises }),
+      ...(nutrition !== undefined && { nutrition }),
+      ...(details !== undefined && { details }),
+      updatedAt: getTimestamp()
+    };
+    
+    db.tasks[index] = updatedTask;
+    writeDatabase(db);
+    
+    res.json(updatedTask);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error updating task',
+      message: error.message
+    });
+  }
+});
+
+// DELETE /api/tasks/:id - Delete task
+app.delete('/api/tasks/:id', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    if (!db.tasks) {
+      db.tasks = [];
+    }
+    
+    const index = db.tasks.findIndex(t => t.id === parseInt(req.params.id));
+    
+    if (index === -1) {
+      return res.status(404).json({
+        error: 'Task not found'
+      });
+    }
+    
+    db.tasks.splice(index, 1);
+    writeDatabase(db);
+    
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error deleting task',
+      message: error.message
+    });
+  }
+});
+
+// ==================== BUDGETS ENDPOINTS ====================
+// All budget endpoints require authentication
+
+// GET /api/budgets - Fetch all budgets
+app.get('/api/budgets', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    res.json(db.budgets || []);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error fetching budgets',
+      message: error.message
+    });
+  }
+});
+
+// GET /api/budgets/:id - Fetch single budget
+app.get('/api/budgets/:id', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    if (!db.budgets) {
+      db.budgets = [];
+    }
+    const budget = db.budgets.find(b => b.id === parseInt(req.params.id));
+    
+    if (!budget) {
+      return res.status(404).json({
+        error: 'Budget not found'
+      });
+    }
+    
+    res.json(budget);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error fetching budget',
+      message: error.message
+    });
+  }
+});
+
+// POST /api/budgets - Create new budget
+app.post('/api/budgets', authenticateToken, (req, res) => {
+  try {
+    const { category, budgetType, amount, percentage, period } = req.body;
+    
+    if (!category || !budgetType || !period) {
+      return res.status(400).json({
+        error: 'Missing required fields: category, budgetType, period'
+      });
+    }
+    
+    if (budgetType === 'percentage' && (!percentage || percentage <= 0 || percentage > 100)) {
+      return res.status(400).json({
+        error: 'Percentage must be between 0 and 100'
+      });
+    }
+    
+    if (budgetType === 'fixed' && (!amount || amount <= 0)) {
+      return res.status(400).json({
+        error: 'Amount must be greater than 0'
+      });
+    }
+    
+    const db = readDatabase();
+    if (!db.budgets) {
+      db.budgets = [];
+    }
+    
+    // Check if budget already exists for this category
+    const existingBudget = db.budgets.find(b => b.category === category && b.period === period);
+    if (existingBudget) {
+      return res.status(409).json({
+        error: 'Budget already exists for this category and period'
+      });
+    }
+    
+    const timestamp = getTimestamp();
+    
+    const newBudget = {
+      id: db.budgets.length > 0 ? Math.max(...db.budgets.map(b => b.id)) + 1 : 1,
+      category,
+      budgetType,
+      period,
+      amount: budgetType === 'fixed' ? parseFloat(amount) : (percentage ? (parseFloat(percentage) / 100) * (req.body.monthlyIncome || 0) : null),
+      percentage: budgetType === 'percentage' ? parseFloat(percentage) : null,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    
+    db.budgets.push(newBudget);
+    writeDatabase(db);
+    
+    res.status(201).json(newBudget);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error creating budget',
+      message: error.message
+    });
+  }
+});
+
+// PUT /api/budgets/:id - Update budget
+app.put('/api/budgets/:id', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    if (!db.budgets) {
+      db.budgets = [];
+    }
+    
+    const index = db.budgets.findIndex(b => b.id === parseInt(req.params.id));
+    
+    if (index === -1) {
+      return res.status(404).json({
+        error: 'Budget not found'
+      });
+    }
+    
+    const { category, budgetType, amount, percentage, period } = req.body;
+    
+    if (budgetType === 'percentage' && percentage !== undefined && (percentage <= 0 || percentage > 100)) {
+      return res.status(400).json({
+        error: 'Percentage must be between 0 and 100'
+      });
+    }
+    
+    if (budgetType === 'fixed' && amount !== undefined && amount <= 0) {
+      return res.status(400).json({
+        error: 'Amount must be greater than 0'
+      });
+    }
+    
+    const updatedBudget = {
+      ...db.budgets[index],
+      ...(category !== undefined && { category }),
+      ...(budgetType !== undefined && { budgetType }),
+      ...(period !== undefined && { period }),
+      ...(budgetType === 'fixed' && amount !== undefined && { amount: parseFloat(amount), percentage: null }),
+      ...(budgetType === 'percentage' && percentage !== undefined && { 
+        percentage: parseFloat(percentage),
+        amount: (parseFloat(percentage) / 100) * (req.body.monthlyIncome || 0)
+      }),
+      updatedAt: getTimestamp()
+    };
+    
+    db.budgets[index] = updatedBudget;
+    writeDatabase(db);
+    
+    res.json(updatedBudget);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error updating budget',
+      message: error.message
+    });
+  }
+});
+
+// DELETE /api/budgets/:id - Delete budget
+app.delete('/api/budgets/:id', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    if (!db.budgets) {
+      db.budgets = [];
+    }
+    
+    const index = db.budgets.findIndex(b => b.id === parseInt(req.params.id));
+    
+    if (index === -1) {
+      return res.status(404).json({
+        error: 'Budget not found'
+      });
+    }
+    
+    db.budgets.splice(index, 1);
+    writeDatabase(db);
+    
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error deleting budget',
       message: error.message
     });
   }

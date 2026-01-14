@@ -1,3 +1,13 @@
+// Import local storage utilities for tasks
+import {
+  getTasksFromStorage,
+  saveTasksToStorage,
+  addTaskToStorage,
+  updateTaskInStorage,
+  deleteTaskFromStorage,
+  getTaskFromStorage
+} from './tasksStorage.js';
+
 // API Configuration
 // Automatically detects API URL based on environment
 const getApiBaseUrl = () => {
@@ -53,7 +63,8 @@ const apiCall = async (endpoint, options = {}) => {
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   } else {
-    console.warn('No auth token found for request to:', endpoint);
+    console.warn('⚠️ No auth token found for request to:', endpoint);
+    console.warn('Please make sure you are logged in.');
   }
   
   try {
@@ -75,8 +86,20 @@ const apiCall = async (endpoint, options = {}) => {
       throw new Error(errorMessage);
     }
 
+    // Handle 409 Conflict - time slot conflicts
+    if (response.status === 409) {
+      const text = await response.text();
+      let errorMessage = 'Time slot conflict';
+      try {
+        const data = JSON.parse(text);
+        errorMessage = data.message || data.error || errorMessage;
+      } catch (e) {
+        // If parsing fails, use default message
+      }
+      throw new Error(errorMessage);
+    }
+
     // Handle 403 Forbidden - authentication issue
-    // Only auto-logout for critical auth endpoints, not for feature endpoints that might not exist
     if (response.status === 403) {
       const text = await response.text();
       let errorMessage = 'Access denied.';
@@ -85,6 +108,21 @@ const apiCall = async (endpoint, options = {}) => {
         errorMessage = data.error || errorMessage;
       } catch (e) {
         // If parsing fails, use default message
+      }
+      
+      // Check if user is logged in
+      if (!token) {
+        errorMessage = 'Please login to access this feature.';
+        // Redirect to login if not authenticated
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('authToken');
+          window.location.reload();
+        }
+      } else {
+        // Token exists but is invalid - might need to re-login
+        console.error('❌ Authentication failed. Token may be invalid or expired.');
+        console.error('Endpoint:', endpoint);
+        console.error('Error:', errorMessage);
       }
       
       // Only auto-logout for critical auth endpoints (like /auth/me)
@@ -278,6 +316,82 @@ export const notesAPI = {
   },
 };
 
+// ==================== TASKS API ====================
+
+export const tasksAPI = {
+  // Get all tasks (with local storage fallback)
+  getAll: async () => {
+    try {
+      return await apiCall('/tasks');
+    } catch (error) {
+      console.warn('API call failed, using local storage:', error.message);
+      // Fallback to local storage
+      return getTasksFromStorage();
+    }
+  },
+
+  // Get single task by ID (with local storage fallback)
+  getById: async (id) => {
+    try {
+      return await apiCall(`/tasks/${id}`);
+    } catch (error) {
+      console.warn('API call failed, using local storage:', error.message);
+      // Fallback to local storage
+      return getTaskFromStorage(id);
+    }
+  },
+
+  // Create new task (with local storage fallback)
+  create: async (taskData) => {
+    try {
+      const result = await apiCall('/tasks', {
+        method: 'POST',
+        body: JSON.stringify(taskData),
+      });
+      // Also save to local storage as backup
+      addTaskToStorage(result);
+      return result;
+    } catch (error) {
+      console.warn('API call failed, using local storage:', error.message);
+      // Fallback to local storage
+      return addTaskToStorage(taskData);
+    }
+  },
+
+  // Update task (with local storage fallback)
+  update: async (id, taskData) => {
+    try {
+      const result = await apiCall(`/tasks/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(taskData),
+      });
+      // Also update in local storage
+      updateTaskInStorage(id, result);
+      return result;
+    } catch (error) {
+      console.warn('API call failed, using local storage:', error.message);
+      // Fallback to local storage
+      return updateTaskInStorage(id, taskData);
+    }
+  },
+
+  // Delete task (with local storage fallback)
+  delete: async (id) => {
+    try {
+      await apiCall(`/tasks/${id}`, {
+        method: 'DELETE',
+      });
+      // Also delete from local storage
+      deleteTaskFromStorage(id);
+      return true;
+    } catch (error) {
+      console.warn('API call failed, using local storage:', error.message);
+      // Fallback to local storage
+      return deleteTaskFromStorage(id);
+    }
+  },
+};
+
 // ==================== PARTIES API ====================
 
 export const partiesAPI = {
@@ -395,6 +509,43 @@ export const ledgerAPI = {
   // Delete ledger entry
   delete: async (entryId) => {
     return apiCall(`/ledger/entries/${entryId}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// ==================== BUDGETS API ====================
+
+export const budgetsAPI = {
+  // Get all budgets
+  getAll: async () => {
+    return apiCall('/budgets');
+  },
+
+  // Get single budget by ID
+  getById: async (id) => {
+    return apiCall(`/budgets/${id}`);
+  },
+
+  // Create new budget
+  create: async (budgetData) => {
+    return apiCall('/budgets', {
+      method: 'POST',
+      body: JSON.stringify(budgetData),
+    });
+  },
+
+  // Update budget
+  update: async (id, budgetData) => {
+    return apiCall(`/budgets/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(budgetData),
+    });
+  },
+
+  // Delete budget
+  delete: async (id) => {
+    return apiCall(`/budgets/${id}`, {
       method: 'DELETE',
     });
   },

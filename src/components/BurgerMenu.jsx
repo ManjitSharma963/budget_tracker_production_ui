@@ -11,6 +11,7 @@ function BurgerMenu({ viewMode, setViewMode }) {
     { id: 'income', label: 'Income', icon: '💰' },
     { id: 'credits', label: 'Credits', icon: '💳' },
     { id: 'notes', label: 'Notes', icon: '📝' },
+    { id: 'tasks', label: 'Tasks', icon: '✅' },
     { id: 'parties', label: 'Parties', icon: '🏢' }
   ]
 

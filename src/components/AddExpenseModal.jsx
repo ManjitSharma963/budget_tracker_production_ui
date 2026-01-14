@@ -5,6 +5,57 @@ const expenseCategories = ['Grocery', 'Entertainment', 'Transport', 'Health Care
 const incomeCategories = ['Salary', 'Rent Payment', 'Get Commission', 'Other Add Income Type']
 const paymentModes = ['Cash', 'Card', 'UPI', 'Bank Transfer', 'Other']
 
+// Smart category detection based on keywords
+const detectCategory = (text) => {
+  if (!text) return null
+  
+  const lowerText = text.toLowerCase()
+  
+  // Food & Beverages
+  const foodKeywords = ['milk', 'bread', 'rice', 'wheat', 'flour', 'sugar', 'tea', 'coffee', 'juice', 'water', 'coke', 'pepsi', 'soda', 'snacks', 'chips', 'biscuit', 'chocolate', 'fruit', 'vegetable', 'meat', 'chicken', 'fish', 'egg', 'cheese', 'butter', 'oil', 'spice', 'salt', 'pepper', 'restaurant', 'dining', 'lunch', 'dinner', 'breakfast', 'food', 'meal']
+  if (foodKeywords.some(keyword => lowerText.includes(keyword))) {
+    return 'Food'
+  }
+  
+  // Transport
+  const transportKeywords = ['petrol', 'diesel', 'gas', 'fuel', 'uber', 'ola', 'taxi', 'bus', 'train', 'metro', 'auto', 'rickshaw', 'parking', 'toll', 'ticket', 'fare', 'transport', 'travel', 'flight', 'airport', 'cab', 'driver']
+  if (transportKeywords.some(keyword => lowerText.includes(keyword))) {
+    return 'Transport'
+  }
+  
+  // Bills & Utilities
+  const billsKeywords = ['electricity', 'electric', 'power', 'bill', 'water bill', 'gas bill', 'internet', 'wifi', 'broadband', 'phone', 'mobile', 'telephone', 'landline', 'utility', 'utilities', 'maintenance', 'rent', 'house rent', 'apartment']
+  if (billsKeywords.some(keyword => lowerText.includes(keyword))) {
+    return 'Bills'
+  }
+  
+  // Grocery
+  const groceryKeywords = ['grocery', 'supermarket', 'mart', 'store', 'shop', 'buy', 'purchase', 'shopping', 'market']
+  if (groceryKeywords.some(keyword => lowerText.includes(keyword)) && !lowerText.includes('online')) {
+    return 'Grocery'
+  }
+  
+  // Shopping
+  const shoppingKeywords = ['shopping', 'mall', 'online', 'amazon', 'flipkart', 'clothes', 'dress', 'shirt', 'pant', 'shoe', 'watch', 'gadget', 'phone', 'laptop', 'electronics', 'appliance']
+  if (shoppingKeywords.some(keyword => lowerText.includes(keyword))) {
+    return 'Shopping'
+  }
+  
+  // Health Care
+  const healthKeywords = ['medicine', 'pharmacy', 'doctor', 'hospital', 'clinic', 'medical', 'health', 'checkup', 'test', 'lab', 'prescription', 'tablet', 'syrup', 'vitamin', 'supplement']
+  if (healthKeywords.some(keyword => lowerText.includes(keyword))) {
+    return 'Health Care'
+  }
+  
+  // Entertainment
+  const entertainmentKeywords = ['movie', 'cinema', 'theater', 'netflix', 'prime', 'hotstar', 'streaming', 'game', 'gaming', 'concert', 'show', 'event', 'party', 'celebration', 'entertainment', 'fun']
+  if (entertainmentKeywords.some(keyword => lowerText.includes(keyword))) {
+    return 'Entertainment'
+  }
+  
+  return null
+}
+
 function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction = null }) {
   const categories = viewMode === 'expenses' ? expenseCategories : incomeCategories
   const creditTypes = ['BORROWED', 'LENT']
@@ -21,6 +72,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
     personName: ''
   })
   const [showCustomCategory, setShowCustomCategory] = useState(false)
+  const [autoDetectedCategory, setAutoDetectedCategory] = useState(null)
 
   // Populate form when editing
   React.useEffect(() => {
@@ -51,6 +103,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
         })
         setShowCustomCategory(isCustomCategory)
       }
+      setAutoDetectedCategory(null)
     } else if (!editTransaction && isOpen) {
       // Reset form for new entry
       setFormData({
@@ -64,6 +117,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
         personName: ''
       })
       setShowCustomCategory(false)
+      setAutoDetectedCategory(null)
     }
   }, [editTransaction, isOpen, viewMode, categories])
 
@@ -75,6 +129,29 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
       ...prev,
       [name]: value
     }))
+    
+    // Smart category detection when note is entered
+    if (name === 'note' && value && viewMode === 'expenses') {
+      const detectedCategory = detectCategory(value)
+      if (detectedCategory && categories.includes(detectedCategory)) {
+        // Only auto-select if category is not already set, or if user hasn't manually selected one
+        if (!formData.category || formData.category === '') {
+          setFormData(prev => ({
+            ...prev,
+            category: detectedCategory
+          }))
+          setAutoDetectedCategory(detectedCategory)
+        } else {
+          // Show suggestion even if category is already set
+          setAutoDetectedCategory(detectedCategory)
+        }
+      } else {
+        setAutoDetectedCategory(null)
+      }
+    } else if (name === 'category') {
+      // Clear auto-detected indicator when user manually selects category
+      setAutoDetectedCategory(null)
+    }
     
     if (name === 'category' && value === 'Other Add Income Type') {
       setShowCustomCategory(true)
@@ -139,6 +216,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
       personName: ''
     })
     setShowCustomCategory(false)
+    setAutoDetectedCategory(null)
     onClose()
   }
 
@@ -154,6 +232,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
       personName: ''
     })
     setShowCustomCategory(false)
+    setAutoDetectedCategory(null)
     onClose()
   }
 
@@ -253,7 +332,14 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
 
           {viewMode !== 'credits' && (
             <div className="form-group">
-              <label htmlFor="category">Category</label>
+              <label htmlFor="category">
+                Category
+                {autoDetectedCategory && formData.category === autoDetectedCategory && (
+                  <span style={{ fontSize: '12px', color: '#14b8a6', marginLeft: '8px', fontWeight: 'normal' }}>
+                    (Auto-detected)
+                  </span>
+                )}
+              </label>
               <select
                 id="category"
                 name="category"
@@ -261,6 +347,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
                 onChange={handleChange}
                 required
                 className="form-input"
+                style={autoDetectedCategory && formData.category === autoDetectedCategory ? { borderColor: '#14b8a6' } : {}}
               >
                 <option value="">Select Category</option>
                 {categories.map(cat => (
@@ -270,6 +357,11 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
                   <option value="Custom">Add New Category</option>
                 )}
               </select>
+              {autoDetectedCategory && formData.category !== autoDetectedCategory && (
+                <div style={{ fontSize: '12px', color: '#14b8a6', marginTop: '4px' }}>
+                  💡 Suggested: {autoDetectedCategory}
+                </div>
+              )}
             </div>
           )}
 

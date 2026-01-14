@@ -18,7 +18,8 @@ function PieChart({ total, data }) {
     'Salary': '#2ecc71',
     'Rent Payment': '#3498db',
     'Get Commission': '#f39c12',
-    'Other Add Income Type': '#95a5a6'
+    'Other Add Income Type': '#95a5a6',
+    'Remaining': '#3498db' // Special color for remaining income
   }
   
   // Generate color for unknown categories
