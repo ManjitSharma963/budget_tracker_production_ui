@@ -19,11 +19,21 @@ import AddPartyModal from './components/AddPartyModal'
 import AddLedgerEntryModal from './components/AddLedgerEntryModal'
 import BudgetModal from './components/BudgetModal'
 import BudgetList from './components/BudgetList'
+import SavingsGoalsList from './components/SavingsGoalsList'
+import SavingsGoalModal from './components/SavingsGoalModal'
+import ComparisonChart from './components/ComparisonChart'
+import CategoryInsights from './components/CategoryInsights'
+import SpendingForecast from './components/SpendingForecast'
+import LoadingSkeleton from './components/LoadingSkeleton'
+import ConfirmationDialog from './components/ConfirmationDialog'
+import EmptyState from './components/EmptyState'
 import SearchBar from './components/SearchBar'
 import MonthlySummary from './components/MonthlySummary'
 import StatisticsCards from './components/StatisticsCards'
 import Toast from './components/Toast'
-import { expensesAPI, incomeAPI, creditsAPI, notesAPI, partiesAPI, ledgerAPI, tasksAPI, budgetsAPI } from './services/api'
+import { expensesAPI, incomeAPI, creditsAPI, notesAPI, partiesAPI, ledgerAPI, tasksAPI, budgetsAPI, recurringAPI, templatesAPI, savingsGoalsAPI } from './services/api'
+import { getPreferredCurrency, savePreferredCurrency } from './services/currency'
+import { requestNotificationPermission, scheduleAllTaskReminders } from './services/notifications'
 import { mapExpenseFromAPI, mapExpenseToAPI, mapIncomeFromAPI, mapIncomeToAPI, mapCreditFromAPI, mapCreditToAPI } from './utils/dataMapper'
 import { exportTransactionsToCSV, exportCreditsToCSV } from './utils/csvExport'
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
@@ -49,6 +59,7 @@ function App() {
   const [tasks, setTasks] = useState([])
   const [parties, setParties] = useState([])
   const [budgets, setBudgets] = useState([])
+  const [recurringItems, setRecurringItems] = useState([])
   const [selectedParty, setSelectedParty] = useState(null)
   const [ledgerEntries, setLedgerEntries] = useState([])
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
@@ -69,12 +80,38 @@ function App() {
   const [dateRange, setDateRange] = useState({ start: '', end: '' })
   const [showMonthlySummary, setShowMonthlySummary] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('')
+  const [selectedCategories, setSelectedCategories] = useState([])
+  const [amountRange, setAmountRange] = useState({ min: null, max: null })
+  const [filterPresets, setFilterPresets] = useState([])
+  const [expenseTemplates, setExpenseTemplates] = useState([])
+  const [savingsGoals, setSavingsGoals] = useState([])
+  const [isSavingsGoalModalOpen, setIsSavingsGoalModalOpen] = useState(false)
+  const [editSavingsGoal, setEditSavingsGoal] = useState(null)
   const [sortBy, setSortBy] = useState('date-desc')
   const [isLoading, setIsLoading] = useState(false)
   const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' })
   const [darkMode, setDarkMode] = useState(false)
+  const [preferredCurrency, setPreferredCurrency] = useState(getPreferredCurrency())
+  const [confirmationDialog, setConfirmationDialog] = useState({ isOpen: false })
+  const [lastDeletedItem, setLastDeletedItem] = useState(null)
 
   // Check if user is already authenticated on mount
+  useEffect(() => {
+    // Request notification permission on app load
+    requestNotificationPermission()
+    
+    // Load preferred currency
+    const savedCurrency = getPreferredCurrency()
+    setPreferredCurrency(savedCurrency)
+  }, [])
+
+  // Schedule task reminders when tasks change
+  useEffect(() => {
+    if (tasks && tasks.length > 0) {
+      scheduleAllTaskReminders(tasks)
+    }
+  }, [tasks])
+
   useEffect(() => {
     const checkAuth = async () => {
       const token = getAuthToken()
@@ -98,6 +135,20 @@ function App() {
     checkAuth()
   }, [])
 
+  // Helper to extract data from paginated or non-paginated responses
+  const extractData = (data) => {
+    if (!data) return []
+    // Check if it's a paginated response (has 'content' property)
+    if (data.content && Array.isArray(data.content)) {
+      return data.content
+    }
+    // Otherwise, check if it's already an array
+    if (Array.isArray(data)) {
+      return data
+    }
+    return []
+  }
+
   // Fetch data from API on component mount (only if authenticated)
   useEffect(() => {
     if (!isAuthenticated) {
@@ -109,42 +160,37 @@ function App() {
       setLoading(true)
       setError(null)
       try {
-        // Fetch expenses, income, credits, notes, tasks, parties, and budgets in parallel
-        const [expensesData, incomeData, creditsData, notesData, tasksData, partiesData, budgetsData] = await Promise.all([
+        // Fetch expenses, income, credits, notes, tasks, parties, budgets, recurring items, templates, and savings goals in parallel
+        const [expensesData, incomeData, creditsData, notesData, tasksData, partiesData, budgetsData, recurringData, templatesData, savingsGoalsData] = await Promise.all([
           expensesAPI.getAll().catch(() => []),
           incomeAPI.getAll().catch(() => []),
           creditsAPI.getAll().catch(() => []),
           notesAPI.getAll().catch(() => []),
           tasksAPI.getAll().catch(() => []),
           partiesAPI.getAll().catch(() => []),
-          budgetsAPI.getAll().catch(() => [])
+          budgetsAPI.getAll().catch(() => []),
+          recurringAPI.getAll().catch(() => []),
+          templatesAPI.getAll().catch(() => []),
+          savingsGoalsAPI.getAll().catch(() => [])
         ])
 
         // Map API data to UI format
-        const mappedExpenses = Array.isArray(expensesData) 
-          ? expensesData.map(mapExpenseFromAPI)
-          : []
-        const mappedIncome = Array.isArray(incomeData)
-          ? incomeData.map(mapIncomeFromAPI)
-          : []
-        const mappedCredits = Array.isArray(creditsData)
-          ? creditsData.map(mapCreditFromAPI)
-          : []
+        const mappedExpenses = extractData(expensesData).map(mapExpenseFromAPI)
+        const mappedIncome = extractData(incomeData).map(mapIncomeFromAPI)
+        const mappedCredits = extractData(creditsData).map(mapCreditFromAPI)
         
         // Map parties data (phone -> contact)
-        let mappedParties = Array.isArray(partiesData)
-          ? partiesData.map(party => ({
-              ...party,
-              contact: party.phone || party.contact
-            }))
-          : []
+        let mappedParties = extractData(partiesData).map(party => ({
+          ...party,
+          contact: party.phone || party.contact
+        }))
 
         // Load ledger data for all parties to calculate totals
         try {
           const ledgerPromises = mappedParties.map(async (party) => {
             try {
               const ledgerData = await partiesAPI.getLedger(party.id)
-              const entries = Array.isArray(ledgerData) ? ledgerData : []
+              const entries = extractData(ledgerData)
               
               // Calculate totals from ledger entries
               let totalPurchases = 0
@@ -195,10 +241,10 @@ function App() {
         // Combine expenses and income into transactions
         setTransactions([...mappedExpenses, ...mappedIncome])
         setCredits(mappedCredits)
-        setNotes(Array.isArray(notesData) ? notesData : [])
+        setNotes(extractData(notesData))
         
         // Tasks: Use API data, or fallback to local storage (handled in API)
-        const tasksToSet = Array.isArray(tasksData) ? tasksData : []
+        const tasksToSet = extractData(tasksData)
         setTasks(tasksToSet)
         
         // If no tasks from API, try loading from local storage
@@ -216,20 +262,31 @@ function App() {
         }
         
         setParties(mappedParties)
-        setBudgets(Array.isArray(budgetsData) ? budgetsData : [])
+        setBudgets(extractData(budgetsData))
+        setRecurringItems(extractData(recurringData))
+        setExpenseTemplates(extractData(templatesData))
+        setSavingsGoals(extractData(savingsGoalsData))
+        
+        // Load filter presets from localStorage
+        try {
+          const savedPresets = localStorage.getItem('filterPresets')
+          if (savedPresets) {
+            setFilterPresets(JSON.parse(savedPresets))
+          }
+        } catch (err) {
+          console.error('Error loading filter presets:', err)
+        }
         
         // If a party is selected, reload its ledger
         if (selectedParty) {
           try {
             const ledgerData = await partiesAPI.getLedger(selectedParty.id)
             // Map API response to UI format
-            const mappedEntries = Array.isArray(ledgerData) 
-              ? ledgerData.map(entry => ({
-                  ...entry,
-                  type: entry.transactionType?.toLowerCase() || entry.type,
-                  date: entry.transactionDate || entry.date
-                }))
-              : []
+            const mappedEntries = extractData(ledgerData).map(entry => ({
+              ...entry,
+              type: entry.transactionType?.toLowerCase() || entry.type,
+              date: entry.transactionDate || entry.date
+            }))
             setLedgerEntries(mappedEntries)
           } catch (err) {
             console.error('Error loading ledger:', err)
@@ -454,24 +511,32 @@ function App() {
   }
 
   const handleDeleteParty = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this party? All ledger entries will also be deleted.')) {
-      return
-    }
-    setIsLoading(true)
-    try {
-      await partiesAPI.delete(id)
-      setParties(prev => prev.filter(p => p.id !== id))
-      if (selectedParty && selectedParty.id === id) {
-        setSelectedParty(null)
-        setLedgerEntries([])
-      }
-      showToast('Party deleted successfully!', 'success')
-    } catch (err) {
-      console.error('Error deleting party:', err)
-      showToast('Failed to delete party', 'error')
-    } finally {
-      setIsLoading(false)
-    }
+    showConfirmation({
+      title: 'Delete Party',
+      message: 'Are you sure you want to delete this party? All ledger entries will also be deleted.',
+      type: 'danger',
+      confirmText: 'Delete',
+      onConfirm: async () => {
+        setIsLoading(true)
+        try {
+          await partiesAPI.delete(id)
+          setParties(prev => prev.filter(p => p.id !== id))
+          if (selectedParty && selectedParty.id === id) {
+            setSelectedParty(null)
+            setLedgerEntries([])
+            setShowPartyLedger(false)
+          }
+          showToast('Party deleted successfully!', 'success')
+          setConfirmationDialog({ isOpen: false })
+        } catch (err) {
+          console.error('Error deleting party:', err)
+          showToast('Failed to delete party', 'error')
+        } finally {
+          setIsLoading(false)
+        }
+      },
+      onCancel: () => setConfirmationDialog({ isOpen: false })
+    })
   }
 
   const handlePartyClick = async (party) => {
@@ -481,13 +546,11 @@ function App() {
     try {
       const ledgerData = await partiesAPI.getLedger(party.id)
       // Map API response to UI format
-      const mappedEntries = Array.isArray(ledgerData)
-        ? ledgerData.map(entry => ({
-            ...entry,
-            type: entry.transactionType?.toLowerCase() || entry.type,
-            date: entry.transactionDate || entry.date
-          }))
-        : []
+      const mappedEntries = extractData(ledgerData).map(entry => ({
+        ...entry,
+        type: entry.transactionType?.toLowerCase() || entry.type,
+        date: entry.transactionDate || entry.date
+      }))
       setLedgerEntries(mappedEntries)
     } catch (err) {
       console.error('Error loading ledger:', err)
@@ -570,13 +633,11 @@ function App() {
       // Reload ledger entries and calculate totals
       try {
         const ledgerData = await partiesAPI.getLedger(selectedParty.id)
-        const mappedEntries = Array.isArray(ledgerData)
-          ? ledgerData.map(entry => ({
-              ...entry,
-              type: entry.transactionType?.toLowerCase() || entry.type,
-              date: entry.transactionDate || entry.date
-            }))
-          : []
+        const mappedEntries = extractData(ledgerData).map(entry => ({
+          ...entry,
+          type: entry.transactionType?.toLowerCase() || entry.type,
+          date: entry.transactionDate || entry.date
+        }))
         setLedgerEntries(mappedEntries)
         
         // Calculate totals from ledger entries
@@ -632,10 +693,13 @@ function App() {
 
   const handleDeleteLedgerEntry = async (entryId) => {
     if (!selectedParty) return
-    if (!window.confirm('Are you sure you want to delete this ledger entry?')) {
-      return
-    }
-    setIsLoading(true)
+    showConfirmation({
+      title: 'Delete Ledger Entry',
+      message: 'Are you sure you want to delete this ledger entry?',
+      type: 'danger',
+      confirmText: 'Delete',
+      onConfirm: async () => {
+        setIsLoading(true)
     try {
       await ledgerAPI.delete(entryId)
       setLedgerEntries(prev => prev.filter(e => e.id !== entryId))
@@ -646,13 +710,11 @@ function App() {
       // Reload ledger entries and calculate totals
       try {
         const ledgerData = await partiesAPI.getLedger(selectedParty.id)
-        const mappedEntries = Array.isArray(ledgerData)
-          ? ledgerData.map(entry => ({
-              ...entry,
-              type: entry.transactionType?.toLowerCase() || entry.type,
-              date: entry.transactionDate || entry.date
-            }))
-          : []
+        const mappedEntries = extractData(ledgerData).map(entry => ({
+          ...entry,
+          type: entry.transactionType?.toLowerCase() || entry.type,
+          date: entry.transactionDate || entry.date
+        }))
         setLedgerEntries(mappedEntries)
         
         // Calculate totals from ledger entries
@@ -697,16 +759,61 @@ function App() {
         setSelectedParty(mappedParty)
       }
       
-      showToast('Ledger entry deleted successfully!', 'success')
-    } catch (err) {
-      console.error('Error deleting ledger entry:', err)
-      showToast('Failed to delete ledger entry', 'error')
-    } finally {
-      setIsLoading(false)
-    }
+          showToast('Ledger entry deleted successfully!', 'success')
+          setConfirmationDialog({ isOpen: false })
+        } catch (err) {
+          console.error('Error deleting ledger entry:', err)
+          showToast('Failed to delete ledger entry', 'error')
+        } finally {
+          setIsLoading(false)
+        }
+      },
+      onCancel: () => setConfirmationDialog({ isOpen: false })
+    })
+  }
+
+  // Show confirmation dialog
+  const showConfirmation = (config) => {
+    setConfirmationDialog({ isOpen: true, ...config })
   }
 
   const handleDeleteTransaction = async (id) => {
+    const transaction = transactions.find(t => t.id === id)
+    if (!transaction) return
+
+    showConfirmation({
+      title: 'Delete Transaction',
+      message: `Are you sure you want to delete "${transaction.description}"?`,
+      type: 'danger',
+      confirmText: 'Delete',
+      onConfirm: async () => {
+        setIsLoading(true)
+        try {
+          if (transaction.type === 'expense') {
+            await expensesAPI.delete(id)
+          } else if (transaction.type === 'income') {
+            await incomeAPI.delete(id)
+          }
+          
+          setLastDeletedItem({ type: 'transaction', data: transaction, id })
+          setTransactions(prev => prev.filter(t => t.id !== id))
+          showToast('Transaction deleted successfully!', 'success')
+          setConfirmationDialog({ isOpen: false })
+          
+          // Auto-hide undo option after 5 seconds
+          setTimeout(() => setLastDeletedItem(null), 5000)
+        } catch (err) {
+          console.error('Error deleting transaction:', err)
+          showToast('Failed to delete transaction. Please try again.', 'error')
+        } finally {
+          setIsLoading(false)
+        }
+      },
+      onCancel: () => setConfirmationDialog({ isOpen: false })
+    })
+  }
+
+  const handleDeleteTransactionDirect = async (id) => {
     setIsLoading(true)
     try {
       const transaction = transactions.find(t => t.id === id)
@@ -906,6 +1013,63 @@ function App() {
     setEditBudget(null)
   }
 
+  // Savings Goals handlers
+  const handleAddSavingsGoalClick = () => {
+    setEditSavingsGoal(null)
+    setIsSavingsGoalModalOpen(true)
+  }
+
+  const handleEditSavingsGoalClick = (goal) => {
+    setEditSavingsGoal(goal)
+    setIsSavingsGoalModalOpen(true)
+  }
+
+  const handleSavingsGoalModalClose = () => {
+    setIsSavingsGoalModalOpen(false)
+    setEditSavingsGoal(null)
+  }
+
+  const handleSavingsGoalFormSubmit = async (goalData) => {
+    setIsLoading(true)
+    try {
+      if (goalData.action === 'delete') {
+        await savingsGoalsAPI.delete(goalData.id)
+        setSavingsGoals(prev => prev.filter(g => g.id !== goalData.id))
+        showToast('Savings goal deleted successfully!', 'success')
+      } else if (goalData.action === 'update') {
+        const updated = await savingsGoalsAPI.update(goalData.id, goalData)
+        setSavingsGoals(prev => prev.map(g => g.id === goalData.id ? updated : g))
+        showToast('Savings goal updated successfully!', 'success')
+      } else {
+        const newGoal = await savingsGoalsAPI.create(goalData)
+        setSavingsGoals(prev => [newGoal, ...prev])
+        showToast('Savings goal created successfully!', 'success')
+      }
+      handleSavingsGoalModalClose()
+    } catch (err) {
+      console.error('Error saving savings goal:', err)
+      showToast(err.message || 'Failed to save savings goal. Please try again.', 'error')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleUpdateSavingsGoalAmount = async (goalId, newAmount) => {
+    try {
+      const goal = savingsGoals.find(g => g.id === goalId)
+      if (goal) {
+        const updated = await savingsGoalsAPI.update(goalId, { ...goal, currentAmount: newAmount })
+        setSavingsGoals(prev => prev.map(g => g.id === goalId ? updated : g))
+        if (newAmount >= goal.targetAmount) {
+          showToast(`🎉 Congratulations! You've reached your goal: ${goal.name}!`, 'success')
+        }
+      }
+    } catch (err) {
+      console.error('Error updating savings goal:', err)
+      showToast('Failed to update savings goal amount.', 'error')
+    }
+  }
+
   const handleBudgetFormSubmit = async (budgetData) => {
     // Check if user is authenticated
     const token = getAuthToken()
@@ -1006,7 +1170,47 @@ function App() {
           mappedExpense.budget = 0
           mappedExpense.remaining = 0
           setTransactions(prev => [mappedExpense, ...prev])
-          showToast('Expense added successfully!', 'success')
+          
+          // If save as template, create template
+          if (formData.saveAsTemplate && formData.templateName) {
+            try {
+              const templateData = {
+                name: formData.templateName,
+                amount: formData.amount,
+                category: formData.category,
+                paymentMode: formData.paymentMode || 'Cash',
+                note: formData.note || ''
+              }
+              const newTemplate = await templatesAPI.create(templateData)
+              setExpenseTemplates(prev => [newTemplate, ...prev])
+            } catch (templateErr) {
+              console.error('Error creating template:', templateErr)
+            }
+          }
+
+          // If recurring, create recurring item
+          if (formData.isRecurring) {
+            try {
+              const recurringData = {
+                type: 'expense',
+                amount: formData.amount,
+                description: formData.note || formData.category,
+                category: formData.category,
+                frequency: formData.frequency,
+                startDate: formData.startDate,
+                endDate: formData.endDate || null,
+                isActive: true
+              }
+              const newRecurring = await recurringAPI.create(recurringData)
+              setRecurringItems(prev => [newRecurring, ...prev])
+              showToast('Expense and recurring item added successfully!', 'success')
+            } catch (recurringErr) {
+              console.error('Error creating recurring item:', recurringErr)
+              showToast('Expense added, but failed to create recurring item', 'error')
+            }
+          } else if (!formData.saveAsTemplate) {
+            showToast('Expense added successfully!', 'success')
+          }
         }
       } else if (formData.type === 'income') {
         const apiData = mapIncomeToAPI({
@@ -1031,7 +1235,47 @@ function App() {
           mappedIncome.paymentMode = formData.paymentMode || 'Cash'
           mappedIncome.note = formData.note || ''
           setTransactions(prev => [mappedIncome, ...prev])
-          showToast('Income added successfully!', 'success')
+          
+          // If save as template, create template
+          if (formData.saveAsTemplate && formData.templateName) {
+            try {
+              const templateData = {
+                name: formData.templateName,
+                amount: formData.amount,
+                category: formData.category,
+                paymentMode: formData.paymentMode || 'Cash',
+                note: formData.note || ''
+              }
+              const newTemplate = await templatesAPI.create(templateData)
+              setExpenseTemplates(prev => [newTemplate, ...prev])
+            } catch (templateErr) {
+              console.error('Error creating template:', templateErr)
+            }
+          }
+
+          // If recurring, create recurring item
+          if (formData.isRecurring) {
+            try {
+              const recurringData = {
+                type: 'income',
+                amount: formData.amount,
+                description: formData.note || formData.category,
+                source: formData.category,
+                frequency: formData.frequency,
+                startDate: formData.startDate,
+                endDate: formData.endDate || null,
+                isActive: true
+              }
+              const newRecurring = await recurringAPI.create(recurringData)
+              setRecurringItems(prev => [newRecurring, ...prev])
+              showToast('Income and recurring item added successfully!', 'success')
+            } catch (recurringErr) {
+              console.error('Error creating recurring item:', recurringErr)
+              showToast('Income added, but failed to create recurring item', 'error')
+            }
+          } else if (!formData.saveAsTemplate) {
+            showToast('Income added successfully!', 'success')
+          }
         }
       }
       handleModalClose()
@@ -1164,7 +1408,65 @@ function App() {
     setSearchQuery('')
     setDateRange({ start: '', end: '' })
     setSelectedCategory('')
+    setSelectedCategories([])
+    setAmountRange({ min: null, max: null })
     setSortBy('date-desc')
+  }
+
+  // Save filter preset
+  const handleSavePreset = (preset) => {
+    const newPresets = [...filterPresets, preset]
+    setFilterPresets(newPresets)
+    localStorage.setItem('filterPresets', JSON.stringify(newPresets))
+    showToast('Filter preset saved!', 'success')
+  }
+
+  // Load filter preset
+  const handleLoadPreset = (preset) => {
+    setSearchQuery(preset.searchQuery || '')
+    setDateRange(preset.dateRange || { start: '', end: '' })
+    setSelectedCategory(preset.selectedCategory || '')
+    setSelectedCategories(preset.selectedCategories || [])
+    setAmountRange(preset.amountRange || { min: null, max: null })
+    setSortBy(preset.sortBy || 'date-desc')
+    showToast(`Loaded preset: ${preset.name}`, 'success')
+  }
+
+  // Duplicate transaction
+  const handleDuplicateTransaction = (transaction) => {
+    setEditTransaction(null)
+    // Create a new transaction with same data but today's date
+    const duplicateData = {
+      ...transaction,
+      date: new Date().toISOString().split('T')[0],
+      id: undefined // Remove ID so it creates a new entry
+    }
+    handleFormSubmit(duplicateData)
+    showToast('Transaction duplicated!', 'success')
+  }
+
+  // Get recent categories (most used in last 30 days)
+  const getRecentCategories = () => {
+    const thirtyDaysAgo = new Date()
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+    
+    const recentTransactions = transactions.filter(t => {
+      const date = new Date(t.date)
+      return date >= thirtyDaysAgo
+    })
+    
+    const categoryCounts = {}
+    recentTransactions.forEach(t => {
+      if (t.category) {
+        categoryCounts[t.category] = (categoryCounts[t.category] || 0) + 1
+      }
+    })
+    
+    // Sort by frequency and return top categories
+    return Object.entries(categoryCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([category]) => category)
+      .slice(0, 5) // Top 5 most used
   }
 
   // Filter credits based on search and date range
@@ -1336,7 +1638,7 @@ function App() {
   return (
     <div className="app-container">
       <Header darkMode={darkMode} onToggleDarkMode={() => setDarkMode(!darkMode)} user={user} onLogout={handleLogout} />
-      <div className="content-section">
+      <main id="main-content" className="content-section" role="main">
         <BurgerMenu viewMode={viewMode} setViewMode={setViewMode} />
         
         {viewMode === 'dashboard' && (
@@ -1407,6 +1709,25 @@ function App() {
                         setIsLoading(false)
                       }
                     }}
+                    onAlert={(alert) => {
+                      // Show toast notification for budget alerts
+                      showToast(alert.message, alert.type)
+                    }}
+                    onApplyRecommendation={async (recommendation) => {
+                      setIsBudgetModalOpen(true)
+                      setEditBudget(null)
+                      // Pre-fill the budget modal with recommendation
+                      setTimeout(() => {
+                        const budgetData = {
+                          category: recommendation.category,
+                          budgetType: recommendation.budgetType,
+                          amount: recommendation.suggestedAmount,
+                          percentage: recommendation.suggestedPercentage,
+                          period: 'monthly'
+                        }
+                        handleBudgetFormSubmit({ action: 'create', ...budgetData })
+                      }, 100)
+                    }}
                   />
                 )
               })()
@@ -1431,6 +1752,13 @@ function App() {
             showSummary={showMonthlySummary}
             selectedCategory={selectedCategory}
             onCategoryChange={setSelectedCategory}
+            selectedCategories={selectedCategories}
+            onCategoriesChange={setSelectedCategories}
+            amountRange={amountRange}
+            onAmountRangeChange={setAmountRange}
+            filterPresets={filterPresets}
+            onSavePreset={handleSavePreset}
+            onLoadPreset={handleLoadPreset}
             sortBy={sortBy}
             onSortChange={setSortBy}
             onClearFilters={handleClearFilters}
@@ -1451,6 +1779,13 @@ function App() {
             showSummary={showMonthlySummary}
             selectedCategory={selectedCategory}
             onCategoryChange={setSelectedCategory}
+            selectedCategories={selectedCategories}
+            onCategoriesChange={setSelectedCategories}
+            amountRange={amountRange}
+            onAmountRangeChange={setAmountRange}
+            filterPresets={filterPresets}
+            onSavePreset={handleSavePreset}
+            onLoadPreset={handleLoadPreset}
             sortBy={sortBy}
             onSortChange={setSortBy}
             onClearFilters={handleClearFilters}
@@ -1573,13 +1908,24 @@ function App() {
               onDelete={handleDeleteParty}
             />
           </>
+        ) : viewMode === 'savings-goals' ? (
+          <SavingsGoalsList
+            goals={savingsGoals}
+            totalSavings={savingsGoals.reduce((sum, g) => sum + (g.currentAmount || 0), 0)}
+            onAddClick={handleAddSavingsGoalClick}
+            onEdit={handleEditSavingsGoalClick}
+            onDelete={(id) => handleSavingsGoalFormSubmit({ action: 'delete', id })}
+            onUpdateAmount={handleUpdateSavingsGoalAmount}
+          />
         ) : viewMode === 'expenses' && expensesViewTab === 'expenses' ? (
           <TransactionList 
             transactions={filteredTransactions} 
             viewMode={viewMode}
             onAddClick={handleAddClick}
             onEdit={handleEditClick}
-            onDelete={handleDeleteTransaction}
+            onDelete={handleDeleteTransactionDirect}
+            onDeleteRequest={handleDeleteTransaction}
+            onDuplicate={handleDuplicateTransaction}
           />
         ) : viewMode !== 'dashboard' && viewMode !== 'expenses' ? (
           <TransactionList 
@@ -1587,16 +1933,20 @@ function App() {
             viewMode={viewMode}
             onAddClick={handleAddClick}
             onEdit={handleEditClick}
-            onDelete={handleDeleteTransaction}
+            onDelete={handleDeleteTransactionDirect}
+            onDeleteRequest={handleDeleteTransaction}
+            onDuplicate={handleDuplicateTransaction}
           />
         ) : null}
-      </div>
+      </main>
       <AddExpenseModal
         isOpen={isModalOpen}
         onClose={handleModalClose}
         onSubmit={handleFormSubmit}
         viewMode={viewMode}
         editTransaction={editTransaction}
+        recentCategories={getRecentCategories()}
+        templates={expenseTemplates}
       />
       <AddNoteModal
         isOpen={isNoteModalOpen}
@@ -1649,6 +1999,54 @@ function App() {
           }).reduce((sum, t) => sum + t.amount, 0)
         })()}
         editBudget={editBudget}
+      />
+      <SavingsGoalModal
+        isOpen={isSavingsGoalModalOpen}
+        onClose={handleSavingsGoalModalClose}
+        onSubmit={handleSavingsGoalFormSubmit}
+        editGoal={editSavingsGoal}
+      />
+      <ConfirmationDialog
+        isOpen={confirmationDialog.isOpen}
+        title={confirmationDialog.title}
+        message={confirmationDialog.message}
+        type={confirmationDialog.type}
+        confirmText={confirmationDialog.confirmText}
+        cancelText={confirmationDialog.cancelText}
+        onConfirm={confirmationDialog.onConfirm}
+        onCancel={confirmationDialog.onCancel}
+        showUndo={lastDeletedItem !== null}
+        undoText="Undo Delete"
+        onUndo={lastDeletedItem ? async () => {
+          try {
+            if (lastDeletedItem.type === 'transaction') {
+              if (lastDeletedItem.data.type === 'expense') {
+                const restored = await expensesAPI.create({
+                  amount: lastDeletedItem.data.amount,
+                  description: lastDeletedItem.data.description,
+                  category: lastDeletedItem.data.category,
+                  date: lastDeletedItem.data.date,
+                  paymentMode: lastDeletedItem.data.paymentMode,
+                  note: lastDeletedItem.data.note
+                })
+                setTransactions(prev => [mapExpenseFromAPI(restored), ...prev])
+              } else {
+                const restored = await incomeAPI.create({
+                  amount: lastDeletedItem.data.amount,
+                  description: lastDeletedItem.data.description,
+                  source: lastDeletedItem.data.category,
+                  date: lastDeletedItem.data.date
+                })
+                setTransactions(prev => [mapIncomeFromAPI(restored), ...prev])
+              }
+            }
+            setLastDeletedItem(null)
+            showToast('Transaction restored!', 'success')
+          } catch (err) {
+            console.error('Error restoring transaction:', err)
+            showToast('Failed to restore transaction', 'error')
+          }
+        } : undefined}
       />
       <Toast
         isVisible={toast.isVisible}

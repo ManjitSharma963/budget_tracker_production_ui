@@ -79,7 +79,11 @@ const initializeDatabase = () => {
     credits: [],
     notes: [],
     tasks: [],
-    budgets: []
+    budgets: [],
+    recurringItems: [],
+    expenseTemplates: [],
+    savingsGoals: [],
+    expenseSplits: []
   };
   
   const dataDir = path.dirname(dbPath);
@@ -99,7 +103,7 @@ const readDatabase = () => {
     return JSON.parse(data);
   } catch (error) {
     console.error('Error reading database:', error);
-    return { expenses: [], income: [], credits: [], notes: [], tasks: [], budgets: [] };
+    return { expenses: [], income: [], credits: [], notes: [], tasks: [], budgets: [], recurringItems: [], expenseTemplates: [], savingsGoals: [], expenseSplits: [] };
   }
 };
 
@@ -1297,6 +1301,558 @@ app.use((req, res) => {
     path: req.path,
     method: req.method
   });
+});
+
+// ==================== RECURRING ITEMS ENDPOINTS ====================
+// All recurring item endpoints require authentication
+
+// GET /api/recurring - Fetch all recurring items
+app.get('/api/recurring', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    res.json(db.recurringItems || []);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error fetching recurring items',
+      message: error.message
+    });
+  }
+});
+
+// GET /api/recurring/:id - Fetch single recurring item
+app.get('/api/recurring/:id', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    if (!db.recurringItems) {
+      db.recurringItems = [];
+    }
+    const item = db.recurringItems.find(r => r.id === parseInt(req.params.id));
+    
+    if (!item) {
+      return res.status(404).json({
+        error: 'Recurring item not found'
+      });
+    }
+    
+    res.json(item);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error fetching recurring item',
+      message: error.message
+    });
+  }
+});
+
+// POST /api/recurring - Create new recurring item
+app.post('/api/recurring', authenticateToken, (req, res) => {
+  try {
+    const { type, amount, description, category, source, frequency, startDate, endDate, isActive } = req.body;
+    
+    if (!type || !amount || !description || !frequency || !startDate) {
+      return res.status(400).json({
+        error: 'Missing required fields: type, amount, description, frequency, startDate'
+      });
+    }
+    
+    if (type !== 'expense' && type !== 'income') {
+      return res.status(400).json({
+        error: 'Type must be either "expense" or "income"'
+      });
+    }
+    
+    if (type === 'expense' && !category) {
+      return res.status(400).json({
+        error: 'Category is required for expenses'
+      });
+    }
+    
+    if (type === 'income' && !source) {
+      return res.status(400).json({
+        error: 'Source is required for income'
+      });
+    }
+    
+    const validFrequencies = ['daily', 'weekly', 'monthly', 'yearly'];
+    if (!validFrequencies.includes(frequency.toLowerCase())) {
+      return res.status(400).json({
+        error: 'Frequency must be one of: daily, weekly, monthly, yearly'
+      });
+    }
+    
+    if (isNaN(amount) || parseFloat(amount) <= 0) {
+      return res.status(400).json({
+        error: 'Amount must be a positive number'
+      });
+    }
+    
+    const db = readDatabase();
+    if (!db.recurringItems) {
+      db.recurringItems = [];
+    }
+    
+    const timestamp = getTimestamp();
+    
+    const newRecurringItem = {
+      id: db.recurringItems.length > 0 ? Math.max(...db.recurringItems.map(r => r.id)) + 1 : 1,
+      type: type.toLowerCase(),
+      amount: parseFloat(amount),
+      description,
+      category: category || null,
+      source: source || null,
+      frequency: frequency.toLowerCase(),
+      startDate,
+      endDate: endDate || null,
+      isActive: isActive !== undefined ? isActive : true,
+      lastGenerated: null,
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    
+    db.recurringItems.push(newRecurringItem);
+    writeDatabase(db);
+    
+    res.status(201).json(newRecurringItem);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error creating recurring item',
+      message: error.message
+    });
+  }
+});
+
+// PUT /api/recurring/:id - Update recurring item
+app.put('/api/recurring/:id', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    if (!db.recurringItems) {
+      db.recurringItems = [];
+    }
+    
+    const index = db.recurringItems.findIndex(r => r.id === parseInt(req.params.id));
+    
+    if (index === -1) {
+      return res.status(404).json({
+        error: 'Recurring item not found'
+      });
+    }
+    
+    const { type, amount, description, category, source, frequency, startDate, endDate, isActive } = req.body;
+    
+    if (type !== undefined && type !== 'expense' && type !== 'income') {
+      return res.status(400).json({
+        error: 'Type must be either "expense" or "income"'
+      });
+    }
+    
+    if (frequency !== undefined) {
+      const validFrequencies = ['daily', 'weekly', 'monthly', 'yearly'];
+      if (!validFrequencies.includes(frequency.toLowerCase())) {
+        return res.status(400).json({
+          error: 'Frequency must be one of: daily, weekly, monthly, yearly'
+        });
+      }
+    }
+    
+    if (amount !== undefined && (isNaN(amount) || parseFloat(amount) <= 0)) {
+      return res.status(400).json({
+        error: 'Amount must be a positive number'
+      });
+    }
+    
+    const updatedItem = {
+      ...db.recurringItems[index],
+      ...(type !== undefined && { type: type.toLowerCase() }),
+      ...(amount !== undefined && { amount: parseFloat(amount) }),
+      ...(description !== undefined && { description }),
+      ...(category !== undefined && { category }),
+      ...(source !== undefined && { source }),
+      ...(frequency !== undefined && { frequency: frequency.toLowerCase() }),
+      ...(startDate !== undefined && { startDate }),
+      ...(endDate !== undefined && { endDate }),
+      ...(isActive !== undefined && { isActive }),
+      updatedAt: getTimestamp()
+    };
+    
+    db.recurringItems[index] = updatedItem;
+    writeDatabase(db);
+    
+    res.json(updatedItem);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error updating recurring item',
+      message: error.message
+    });
+  }
+});
+
+// DELETE /api/recurring/:id - Delete recurring item
+app.delete('/api/recurring/:id', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    if (!db.recurringItems) {
+      db.recurringItems = [];
+    }
+    
+    const index = db.recurringItems.findIndex(r => r.id === parseInt(req.params.id));
+    
+    if (index === -1) {
+      return res.status(404).json({
+        error: 'Recurring item not found'
+      });
+    }
+    
+    db.recurringItems.splice(index, 1);
+    writeDatabase(db);
+    
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error deleting recurring item',
+      message: error.message
+    });
+  }
+});
+
+// POST /api/recurring/:id/generate - Manually generate entry from recurring item
+app.post('/api/recurring/:id/generate', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    if (!db.recurringItems) {
+      db.recurringItems = [];
+    }
+    
+    const recurringItem = db.recurringItems.find(r => r.id === parseInt(req.params.id));
+    
+    if (!recurringItem) {
+      return res.status(404).json({
+        error: 'Recurring item not found'
+      });
+    }
+    
+    if (!recurringItem.isActive) {
+      return res.status(400).json({
+        error: 'Recurring item is not active'
+      });
+    }
+    
+    const timestamp = getTimestamp();
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Create entry based on type
+    if (recurringItem.type === 'expense') {
+      const newExpense = {
+        id: db.expenses.length > 0 ? Math.max(...db.expenses.map(e => e.id)) + 1 : 1,
+        amount: recurringItem.amount,
+        description: recurringItem.description,
+        category: recurringItem.category,
+        date: today,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
+      db.expenses.push(newExpense);
+    } else {
+      const newIncome = {
+        id: db.income.length > 0 ? Math.max(...db.income.map(i => i.id)) + 1 : 1,
+        amount: recurringItem.amount,
+        description: recurringItem.description,
+        source: recurringItem.source,
+        date: today,
+        createdAt: timestamp,
+        updatedAt: timestamp
+      };
+      db.income.push(newIncome);
+    }
+    
+    // Update lastGenerated
+    recurringItem.lastGenerated = today;
+    recurringItem.updatedAt = timestamp;
+    
+    writeDatabase(db);
+    
+    res.status(201).json({
+      message: 'Entry generated successfully',
+      recurringItem
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error generating entry',
+      message: error.message
+    });
+  }
+});
+
+// ==================== EXPENSE TEMPLATES ENDPOINTS ====================
+// All template endpoints require authentication
+
+// GET /api/templates - Fetch all expense templates
+app.get('/api/templates', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    res.json(db.expenseTemplates || []);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error fetching templates',
+      message: error.message
+    });
+  }
+});
+
+// POST /api/templates - Create new template
+app.post('/api/templates', authenticateToken, (req, res) => {
+  try {
+    const { name, amount, category, paymentMode, note } = req.body;
+    
+    if (!name || !amount || !category) {
+      return res.status(400).json({
+        error: 'Missing required fields: name, amount, category'
+      });
+    }
+    
+    if (isNaN(amount) || parseFloat(amount) <= 0) {
+      return res.status(400).json({
+        error: 'Amount must be a positive number'
+      });
+    }
+    
+    const db = readDatabase();
+    if (!db.expenseTemplates) {
+      db.expenseTemplates = [];
+    }
+    
+    const timestamp = getTimestamp();
+    
+    const newTemplate = {
+      id: db.expenseTemplates.length > 0 ? Math.max(...db.expenseTemplates.map(t => t.id)) + 1 : 1,
+      name,
+      amount: parseFloat(amount),
+      category,
+      paymentMode: paymentMode || 'Cash',
+      note: note || '',
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    
+    db.expenseTemplates.push(newTemplate);
+    writeDatabase(db);
+    
+    res.status(201).json(newTemplate);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error creating template',
+      message: error.message
+    });
+  }
+});
+
+// PUT /api/templates/:id - Update template
+app.put('/api/templates/:id', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    if (!db.expenseTemplates) {
+      db.expenseTemplates = [];
+    }
+    
+    const index = db.expenseTemplates.findIndex(t => t.id === parseInt(req.params.id));
+    
+    if (index === -1) {
+      return res.status(404).json({
+        error: 'Template not found'
+      });
+    }
+    
+    const { name, amount, category, paymentMode, note } = req.body;
+    
+    if (amount !== undefined && (isNaN(amount) || parseFloat(amount) <= 0)) {
+      return res.status(400).json({
+        error: 'Amount must be a positive number'
+      });
+    }
+    
+    const updatedTemplate = {
+      ...db.expenseTemplates[index],
+      ...(name !== undefined && { name }),
+      ...(amount !== undefined && { amount: parseFloat(amount) }),
+      ...(category !== undefined && { category }),
+      ...(paymentMode !== undefined && { paymentMode }),
+      ...(note !== undefined && { note }),
+      updatedAt: getTimestamp()
+    };
+    
+    db.expenseTemplates[index] = updatedTemplate;
+    writeDatabase(db);
+    
+    res.json(updatedTemplate);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error updating template',
+      message: error.message
+    });
+  }
+});
+
+// DELETE /api/templates/:id - Delete template
+app.delete('/api/templates/:id', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    if (!db.expenseTemplates) {
+      db.expenseTemplates = [];
+    }
+    
+    const index = db.expenseTemplates.findIndex(t => t.id === parseInt(req.params.id));
+    
+    if (index === -1) {
+      return res.status(404).json({
+        error: 'Template not found'
+      });
+    }
+    
+    db.expenseTemplates.splice(index, 1);
+    writeDatabase(db);
+    
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error deleting template',
+      message: error.message
+    });
+  }
+});
+
+// ==================== SAVINGS GOALS ENDPOINTS ====================
+// All savings goal endpoints require authentication
+
+// GET /api/savings-goals - Fetch all savings goals
+app.get('/api/savings-goals', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    res.json(db.savingsGoals || []);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error fetching savings goals',
+      message: error.message
+    });
+  }
+});
+
+// POST /api/savings-goals - Create new savings goal
+app.post('/api/savings-goals', authenticateToken, (req, res) => {
+  try {
+    const { name, targetAmount, currentAmount, targetDate, description } = req.body;
+    
+    if (!name || !targetAmount) {
+      return res.status(400).json({
+        error: 'Missing required fields: name, targetAmount'
+      });
+    }
+    
+    if (isNaN(targetAmount) || parseFloat(targetAmount) <= 0) {
+      return res.status(400).json({
+        error: 'Target amount must be a positive number'
+      });
+    }
+    
+    const db = readDatabase();
+    if (!db.savingsGoals) {
+      db.savingsGoals = [];
+    }
+    
+    const timestamp = getTimestamp();
+    
+    const newGoal = {
+      id: db.savingsGoals.length > 0 ? Math.max(...db.savingsGoals.map(g => g.id)) + 1 : 1,
+      name,
+      targetAmount: parseFloat(targetAmount),
+      currentAmount: parseFloat(currentAmount || 0),
+      targetDate: targetDate || null,
+      description: description || '',
+      createdAt: timestamp,
+      updatedAt: timestamp
+    };
+    
+    db.savingsGoals.push(newGoal);
+    writeDatabase(db);
+    
+    res.status(201).json(newGoal);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error creating savings goal',
+      message: error.message
+    });
+  }
+});
+
+// PUT /api/savings-goals/:id - Update savings goal
+app.put('/api/savings-goals/:id', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    if (!db.savingsGoals) {
+      db.savingsGoals = [];
+    }
+    
+    const index = db.savingsGoals.findIndex(g => g.id === parseInt(req.params.id));
+    
+    if (index === -1) {
+      return res.status(404).json({
+        error: 'Savings goal not found'
+      });
+    }
+    
+    const { name, targetAmount, currentAmount, targetDate, description } = req.body;
+    
+    if (targetAmount !== undefined && (isNaN(targetAmount) || parseFloat(targetAmount) <= 0)) {
+      return res.status(400).json({
+        error: 'Target amount must be a positive number'
+      });
+    }
+    
+    const updatedGoal = {
+      ...db.savingsGoals[index],
+      ...(name !== undefined && { name }),
+      ...(targetAmount !== undefined && { targetAmount: parseFloat(targetAmount) }),
+      ...(currentAmount !== undefined && { currentAmount: parseFloat(currentAmount) }),
+      ...(targetDate !== undefined && { targetDate }),
+      ...(description !== undefined && { description }),
+      updatedAt: getTimestamp()
+    };
+    
+    db.savingsGoals[index] = updatedGoal;
+    writeDatabase(db);
+    
+    res.json(updatedGoal);
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error updating savings goal',
+      message: error.message
+    });
+  }
+});
+
+// DELETE /api/savings-goals/:id - Delete savings goal
+app.delete('/api/savings-goals/:id', authenticateToken, (req, res) => {
+  try {
+    const db = readDatabase();
+    if (!db.savingsGoals) {
+      db.savingsGoals = [];
+    }
+    
+    const index = db.savingsGoals.findIndex(g => g.id === parseInt(req.params.id));
+    
+    if (index === -1) {
+      return res.status(404).json({
+        error: 'Savings goal not found'
+      });
+    }
+    
+    db.savingsGoals.splice(index, 1);
+    writeDatabase(db);
+    
+    res.status(204).send();
+  } catch (error) {
+    res.status(500).json({
+      error: 'Error deleting savings goal',
+      message: error.message
+    });
+  }
 });
 
 // Start server

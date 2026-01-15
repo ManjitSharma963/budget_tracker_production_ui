@@ -551,6 +551,114 @@ export const budgetsAPI = {
   },
 };
 
+// ==================== RECURRING ITEMS API ====================
+
+export const recurringAPI = {
+  // Get all recurring items
+  getAll: async () => {
+    return apiCall('/recurring');
+  },
+
+  // Get single recurring item by ID
+  getById: async (id) => {
+    return apiCall(`/recurring/${id}`);
+  },
+
+  // Create new recurring item
+  create: async (recurringData) => {
+    return apiCall('/recurring', {
+      method: 'POST',
+      body: JSON.stringify(recurringData),
+    });
+  },
+
+  // Update recurring item
+  update: async (id, recurringData) => {
+    return apiCall(`/recurring/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(recurringData),
+    });
+  },
+
+  // Delete recurring item
+  delete: async (id) => {
+    return apiCall(`/recurring/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Manually generate entry from recurring item
+  generateEntry: async (id) => {
+    return apiCall(`/recurring/${id}/generate`, {
+      method: 'POST',
+    });
+  },
+};
+
+// ==================== EXPENSE TEMPLATES API ====================
+
+export const templatesAPI = {
+  // Get all templates
+  getAll: async () => {
+    return apiCall('/templates');
+  },
+
+  // Create new template
+  create: async (templateData) => {
+    return apiCall('/templates', {
+      method: 'POST',
+      body: JSON.stringify(templateData),
+    });
+  },
+
+  // Update template
+  update: async (id, templateData) => {
+    return apiCall(`/templates/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(templateData),
+    });
+  },
+
+  // Delete template
+  delete: async (id) => {
+    return apiCall(`/templates/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
+// ==================== SAVINGS GOALS API ====================
+
+export const savingsGoalsAPI = {
+  // Get all savings goals
+  getAll: async () => {
+    return apiCall('/savings-goals');
+  },
+
+  // Create new savings goal
+  create: async (goalData) => {
+    return apiCall('/savings-goals', {
+      method: 'POST',
+      body: JSON.stringify(goalData),
+    });
+  },
+
+  // Update savings goal
+  update: async (id, goalData) => {
+    return apiCall(`/savings-goals/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(goalData),
+    });
+  },
+
+  // Delete savings goal
+  delete: async (id) => {
+    return apiCall(`/savings-goals/${id}`, {
+      method: 'DELETE',
+    });
+  },
+};
+
 // ==================== HEALTH CHECK ====================
 
 export const healthCheck = async () => {

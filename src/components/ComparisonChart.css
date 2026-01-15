@@ -1,0 +1,77 @@
+.comparison-chart-container {
+  padding: 20px;
+  background: #0f172a;
+  border-radius: 12px;
+  margin-bottom: 24px;
+}
+
+.comparison-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 24px;
+}
+
+.comparison-section {
+  margin-bottom: 32px;
+}
+
+.comparison-section:last-child {
+  margin-bottom: 0;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 16px;
+}
+
+.comparison-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  text-align: center;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: white;
+}
+
+.change-card {
+  border-color: rgba(102, 126, 234, 0.3);
+  background: rgba(102, 126, 234, 0.05);
+}
+
+.change-value {
+  font-size: 16px;
+}
+
+@media (max-width: 640px) {
+  .comparison-chart-container {
+    padding: 16px;
+  }
+
+  .comparison-stats {
+    grid-template-columns: 1fr;
+  }
+}
+

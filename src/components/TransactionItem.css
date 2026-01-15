@@ -158,6 +158,7 @@
   opacity: 1;
 }
 
+.duplicate-btn,
 .edit-btn,
 .delete-btn {
   background: none;
@@ -170,6 +171,11 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.duplicate-btn:hover {
+  background: rgba(52, 152, 219, 0.1);
+  transform: scale(1.1);
+}
+
 .edit-btn:hover {
   background: rgba(102, 126, 234, 0.1);
   transform: scale(1.1);
@@ -180,6 +186,7 @@
   transform: scale(1.1);
 }
 
+.duplicate-btn:active,
 .edit-btn:active,
 .delete-btn:active {
   transform: scale(0.95);

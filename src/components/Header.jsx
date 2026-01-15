@@ -3,7 +3,7 @@ import './Header.css'
 
 function Header({ darkMode, onToggleDarkMode, user, onLogout }) {
   return (
-    <div className="header">
+    <header className="header" role="banner">
       <div className="header-left">
         <button 
           className="dark-mode-toggle"
@@ -30,7 +30,7 @@ function Header({ darkMode, onToggleDarkMode, user, onLogout }) {
           </div>
         )}
       </div>
-    </div>
+    </header>
   )
 }
 

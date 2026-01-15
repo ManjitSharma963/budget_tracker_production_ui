@@ -151,10 +151,15 @@ function TasksList({ tasks, onAddClick, onEdit, onDelete, onToggleStatus }) {
 
   // Filter tasks by selected date and status
   const filteredTasks = useMemo(() => {
-    const selectedDateStr = selectedDate.toISOString().split('T')[0]
+    // Format selected date in local timezone (YYYY-MM-DD)
+    const year = selectedDate.getFullYear()
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0')
+    const day = String(selectedDate.getDate()).padStart(2, '0')
+    const selectedDateStr = `${year}-${month}-${day}`
     
     let filtered = tasks.filter(task => {
       if (!task.date) return false
+      // Extract date part (handle both "2026-01-14" and "2026-01-14T..." formats)
       const taskDate = task.date.split('T')[0]
       return taskDate === selectedDateStr
     })
@@ -176,7 +181,11 @@ function TasksList({ tasks, onAddClick, onEdit, onDelete, onToggleStatus }) {
 
   // Check if a date has tasks
   const hasTasksForDate = (date) => {
-    const dateStr = date.toISOString().split('T')[0]
+    // Format date in local timezone (YYYY-MM-DD)
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const dateStr = `${year}-${month}-${day}`
     return tasks.some(task => {
       if (!task.date) return false
       return task.date.split('T')[0] === dateStr

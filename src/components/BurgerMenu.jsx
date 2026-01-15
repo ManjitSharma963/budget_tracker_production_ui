@@ -12,7 +12,8 @@ function BurgerMenu({ viewMode, setViewMode }) {
     { id: 'credits', label: 'Credits', icon: '💳' },
     { id: 'notes', label: 'Notes', icon: '📝' },
     { id: 'tasks', label: 'Tasks', icon: '✅' },
-    { id: 'parties', label: 'Parties', icon: '🏢' }
+    { id: 'parties', label: 'Parties', icon: '🏢' },
+    { id: 'savings-goals', label: 'Savings Goals', icon: '🎯' }
   ]
 
   useEffect(() => {

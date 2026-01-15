@@ -3,7 +3,7 @@ import TransactionItem from './TransactionItem'
 import AddButton from './AddButton'
 import './TransactionList.css'
 
-function TransactionList({ transactions, viewMode, onAddClick, onEdit, onDelete }) {
+function TransactionList({ transactions, viewMode, onAddClick, onEdit, onDelete, onDeleteRequest, onDuplicate }) {
   // Group transactions by date
   const groupedTransactions = transactions.reduce((groups, transaction) => {
     const date = transaction.date
@@ -77,6 +77,8 @@ function TransactionList({ transactions, viewMode, onAddClick, onEdit, onDelete 
                   transaction={transaction}
                   onEdit={onEdit}
                   onDelete={onDelete}
+                  onDeleteRequest={onDeleteRequest}
+                  onDuplicate={onDuplicate}
                 />
               ))}
             </div>

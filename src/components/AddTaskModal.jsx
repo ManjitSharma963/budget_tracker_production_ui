@@ -10,7 +10,10 @@ function AddTaskModal({ isOpen, onClose, onSubmit, editTask = null, existingTask
     date: new Date().toISOString().split('T')[0],
     startTime: '',
     endTime: '',
-    status: 'pending'
+    status: 'pending',
+    reminderEnabled: false,
+    reminderTime: '',
+    reminderDate: new Date().toISOString().split('T')[0]
   })
 
   const [errors, setErrors] = useState({})
@@ -67,7 +70,10 @@ function AddTaskModal({ isOpen, onClose, onSubmit, editTask = null, existingTask
         date: editTask.date ? editTask.date.split('T')[0] : new Date().toISOString().split('T')[0],
         startTime: editTask.startTime || '',
         endTime: editTask.endTime || '',
-        status: editTask.status || 'pending'
+        status: editTask.status || 'pending',
+        reminderEnabled: editTask.reminderEnabled || false,
+        reminderTime: editTask.reminderTime || '',
+        reminderDate: editTask.reminderDate ? editTask.reminderDate.split('T')[0] : new Date().toISOString().split('T')[0]
       })
     } else if (!editTask && isOpen) {
       setFormData({
@@ -76,7 +82,10 @@ function AddTaskModal({ isOpen, onClose, onSubmit, editTask = null, existingTask
         date: new Date().toISOString().split('T')[0],
         startTime: '',
         endTime: '',
-        status: 'pending'
+        status: 'pending',
+        reminderEnabled: false,
+        reminderTime: '',
+        reminderDate: new Date().toISOString().split('T')[0]
       })
     }
     setErrors({})
@@ -157,7 +166,10 @@ function AddTaskModal({ isOpen, onClose, onSubmit, editTask = null, existingTask
       date: new Date().toISOString().split('T')[0],
       startTime: '',
       endTime: '',
-      status: 'pending'
+      status: 'pending',
+      reminderEnabled: false,
+      reminderTime: '',
+      reminderDate: new Date().toISOString().split('T')[0]
     })
     setErrors({})
     onClose()

@@ -11,16 +11,25 @@ function SearchBar({
   showSummary,
   selectedCategory,
   onCategoryChange,
+  selectedCategories = [],
+  onCategoriesChange,
+  amountRange,
+  onAmountRangeChange,
   sortBy,
   onSortChange,
   onClearFilters,
   categories = [],
   viewMode,
   onQuickDateFilter,
+  filterPresets = [],
+  onSavePreset,
+  onLoadPreset,
   isLoading
 }) {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
-  const hasActiveFilters = searchQuery || dateRange.start || dateRange.end || selectedCategory || sortBy !== 'date-desc'
+  const [showPresets, setShowPresets] = useState(false)
+  const [presetName, setPresetName] = useState('')
+  const hasActiveFilters = searchQuery || dateRange.start || dateRange.end || selectedCategory || (selectedCategories && selectedCategories.length > 0) || amountRange?.min || amountRange?.max || sortBy !== 'date-desc'
 
   const quickDateFilters = [
     { label: 'Today', value: 'today' },
@@ -84,24 +93,83 @@ function SearchBar({
       </div>
       
       
-      {/* Advanced Filters (Collapsible) */}
+          {/* Advanced Filters (Collapsible) */}
       {showAdvancedFilters && (
         <div className="advanced-filters-panel">
+          {/* Filter Presets */}
+          {filterPresets && filterPresets.length > 0 && (
+            <div className="filter-presets-section">
+              <div className="presets-header">
+                <label className="filter-label-small">Saved Presets</label>
+                <button 
+                  className="preset-toggle-btn"
+                  onClick={() => setShowPresets(!showPresets)}
+                >
+                  {showPresets ? '▼' : '▶'}
+                </button>
+              </div>
+              {showPresets && (
+                <div className="presets-list">
+                  {filterPresets.map((preset, idx) => (
+                    <button
+                      key={idx}
+                      className="preset-btn"
+                      onClick={() => onLoadPreset && onLoadPreset(preset)}
+                      title={preset.name}
+                    >
+                      {preset.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="filter-row-compact">
             {categories.length > 0 && (
-              <div className="filter-group-compact">
-                <label className="filter-label-small">Category</label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => onCategoryChange(e.target.value)}
-                  className="filter-select-small"
-                >
-                  <option value="">All</option>
-                  {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
+              <>
+                <div className="filter-group-compact">
+                  <label className="filter-label-small">Single Category</label>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => {
+                      onCategoryChange(e.target.value)
+                      // Clear multi-select when single is selected
+                      if (onCategoriesChange && e.target.value) {
+                        onCategoriesChange([])
+                      }
+                    }}
+                    className="filter-select-small"
+                  >
+                    <option value="">All</option>
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="filter-group-compact">
+                  <label className="filter-label-small">Multiple Categories</label>
+                  <select
+                    multiple
+                    value={selectedCategories || []}
+                    onChange={(e) => {
+                      const selected = Array.from(e.target.selectedOptions, option => option.value)
+                      onCategoriesChange && onCategoriesChange(selected)
+                      // Clear single select when multi is used
+                      if (selected.length > 0 && onCategoryChange) {
+                        onCategoryChange('')
+                      }
+                    }}
+                    className="filter-select-small filter-multi-select"
+                    size="3"
+                  >
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                  <small className="filter-hint">Hold Ctrl/Cmd to select multiple</small>
+                </div>
+              </>
             )}
             
             <div className="filter-group-compact">
@@ -118,6 +186,39 @@ function SearchBar({
             </div>
           </div>
 
+          {/* Amount Range Filter */}
+          <div className="filter-row-compact">
+            <div className="filter-group-compact">
+              <label className="filter-label-small">Min Amount (₹)</label>
+              <input
+                type="number"
+                value={amountRange?.min || ''}
+                onChange={(e) => onAmountRangeChange && onAmountRangeChange({ 
+                  ...amountRange, 
+                  min: e.target.value ? parseFloat(e.target.value) : null 
+                })}
+                className="filter-input-small"
+                placeholder="0"
+                min="0"
+                step="0.01"
+              />
+            </div>
+            <div className="filter-group-compact">
+              <label className="filter-label-small">Max Amount (₹)</label>
+              <input
+                type="number"
+                value={amountRange?.max || ''}
+                onChange={(e) => onAmountRangeChange && onAmountRangeChange({ 
+                  ...amountRange, 
+                  max: e.target.value ? parseFloat(e.target.value) : null 
+                })}
+                className="filter-input-small"
+                placeholder="No limit"
+                min="0"
+                step="0.01"
+              />
+            </div>
+          </div>
 
           <div className="date-range-compact">
             <input
@@ -136,6 +237,39 @@ function SearchBar({
               placeholder="To"
             />
           </div>
+
+          {/* Save Preset */}
+          {onSavePreset && (
+            <div className="save-preset-section">
+              <input
+                type="text"
+                value={presetName}
+                onChange={(e) => setPresetName(e.target.value)}
+                placeholder="Preset name..."
+                className="preset-input"
+              />
+              <button
+                className="save-preset-btn"
+                onClick={() => {
+                  if (presetName.trim()) {
+                    onSavePreset({
+                      name: presetName,
+                      searchQuery,
+                      dateRange,
+                      selectedCategory,
+                      selectedCategories,
+                      amountRange,
+                      sortBy
+                    })
+                    setPresetName('')
+                  }
+                }}
+                disabled={!presetName.trim()}
+              >
+                💾 Save Preset
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

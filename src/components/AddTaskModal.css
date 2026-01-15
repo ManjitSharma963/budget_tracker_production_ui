@@ -134,6 +134,27 @@
   transform: translateY(0);
 }
 
+/* Reminder Options */
+.reminder-options {
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(52, 152, 219, 0.05);
+  border: 1px solid rgba(52, 152, 219, 0.2);
+  border-radius: 8px;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 640px) {
   .task-modal {
     width: 95%;

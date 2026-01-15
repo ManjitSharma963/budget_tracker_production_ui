@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo, useCallback } from 'react'
+import { sanitizeInput, sanitizeAmount, sanitizeDate, validateFileType, validateFileSize, sanitizeFileName } from '../utils/security'
 import './AddExpenseModal.css'
 
 const expenseCategories = ['Grocery', 'Entertainment', 'Transport', 'Health Care', 'Shopping', 'Food', 'Bills', 'Others']
@@ -56,8 +57,14 @@ const detectCategory = (text) => {
   return null
 }
 
-function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction = null }) {
-  const categories = viewMode === 'expenses' ? expenseCategories : incomeCategories
+function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction = null, recentCategories = [], templates = [] }) {
+  const allCategories = viewMode === 'expenses' ? expenseCategories : incomeCategories
+  
+  // Show recent categories first, then others
+  const categories = [
+    ...recentCategories.filter(cat => allCategories.includes(cat)),
+    ...allCategories.filter(cat => !recentCategories.includes(cat))
+  ]
   const creditTypes = ['BORROWED', 'LENT']
   const isEditMode = !!editTransaction
   
@@ -69,10 +76,18 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
     customCategory: '',
     note: '',
     creditType: 'BORROWED',
-    personName: ''
+    personName: '',
+    isRecurring: false,
+    frequency: 'monthly',
+    startDate: new Date().toISOString().split('T')[0],
+    endDate: '',
+    tags: [],
+    splitWith: [],
+    receiptImage: null
   })
   const [showCustomCategory, setShowCustomCategory] = useState(false)
   const [autoDetectedCategory, setAutoDetectedCategory] = useState(null)
+  const [showTemplates, setShowTemplates] = useState(false)
 
   // Populate form when editing
   React.useEffect(() => {
@@ -99,7 +114,11 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
           customCategory: isCustomCategory ? category : '',
           note: editTransaction.note || '',
           creditType: 'BORROWED',
-          personName: ''
+          personName: '',
+          isRecurring: false,
+          frequency: 'monthly',
+          startDate: new Date().toISOString().split('T')[0],
+          endDate: ''
         })
         setShowCustomCategory(isCustomCategory)
       }
@@ -114,7 +133,11 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
         customCategory: '',
         note: '',
         creditType: 'BORROWED',
-        personName: ''
+        personName: '',
+        isRecurring: false,
+        frequency: 'monthly',
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: ''
       })
       setShowCustomCategory(false)
       setAutoDetectedCategory(null)
@@ -195,13 +218,19 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
         return
       }
 
-      onSubmit({
+      const submitData = {
         ...formData,
         category: finalCategory,
         type: viewMode === 'expenses' ? 'expense' : 'income',
         amount: parseFloat(formData.amount),
-        id: isEditMode ? editTransaction.id : undefined
-      })
+        id: isEditMode ? editTransaction.id : undefined,
+        isRecurring: formData.isRecurring,
+        frequency: formData.frequency,
+        startDate: formData.startDate,
+        endDate: formData.endDate || null
+      }
+      
+      onSubmit(submitData)
     }
 
     // Reset form
@@ -213,7 +242,11 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
       customCategory: '',
       note: '',
       creditType: 'Borrowed',
-      personName: ''
+      personName: '',
+      isRecurring: false,
+      frequency: 'monthly',
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: ''
     })
     setShowCustomCategory(false)
     setAutoDetectedCategory(null)
@@ -229,16 +262,48 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
       customCategory: '',
       note: '',
       creditType: 'Borrowed',
-      personName: ''
+      personName: '',
+      isRecurring: false,
+      frequency: 'monthly',
+      startDate: new Date().toISOString().split('T')[0],
+      endDate: '',
+      tags: [],
+      splitWith: [],
+      receiptImage: null
     })
     setShowCustomCategory(false)
     setAutoDetectedCategory(null)
     onClose()
   }
 
+  // Focus trap for accessibility
+  React.useEffect(() => {
+    if (isOpen) {
+      const modal = document.querySelector('.modal-content')
+      if (modal) {
+        const firstInput = modal.querySelector('input, select, textarea, button')
+        if (firstInput) {
+          setTimeout(() => firstInput.focus(), 100)
+        }
+      }
+    }
+  }, [isOpen])
+
+  if (!isOpen) return null
+
   return (
-    <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+    <div 
+      className="modal-overlay" 
+      onClick={handleClose}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="modal-title"
+    >
+      <div 
+        className="modal-content" 
+        onClick={(e) => e.stopPropagation()}
+        role="document"
+      >
         <div className="modal-header">
           <h2 className="modal-title">
             {isEditMode 
@@ -250,6 +315,47 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
         </div>
         
         <form className="modal-form" onSubmit={handleSubmit}>
+          {/* Quick Add Templates */}
+          {!isEditMode && templates.length > 0 && viewMode !== 'credits' && (
+            <div className="quick-add-section">
+              <div className="quick-add-header">
+                <label>Quick Add from Templates</label>
+                <button 
+                  type="button"
+                  className="toggle-templates-btn"
+                  onClick={() => setShowTemplates(!showTemplates)}
+                >
+                  {showTemplates ? '▼' : '▶'}
+                </button>
+              </div>
+              {showTemplates && (
+                <div className="templates-grid">
+                  {templates.map(template => (
+                    <button
+                      key={template.id}
+                      type="button"
+                      className="template-btn"
+                      onClick={() => {
+                        setFormData({
+                          ...formData,
+                          amount: template.amount.toString(),
+                          category: template.category,
+                          paymentMode: template.paymentMode || 'Cash',
+                          note: template.note || ''
+                        })
+                        setShowTemplates(false)
+                      }}
+                    >
+                      <div className="template-name">{template.name}</div>
+                      <div className="template-amount">₹{template.amount.toLocaleString()}</div>
+                      <div className="template-category">{template.category}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="form-group">
             <label htmlFor="date">Date</label>
             <input
@@ -395,6 +501,240 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
               className="form-input form-textarea"
             />
           </div>
+
+          {/* Tags */}
+          {viewMode !== 'credits' && (
+            <div className="form-group">
+              <label htmlFor="tags">Tags (Optional)</label>
+              <input
+                type="text"
+                id="tags"
+                name="tags"
+                value={formData.tags.join(', ')}
+                onChange={(e) => {
+                  const tagString = e.target.value
+                  const tags = tagString.split(',').map(t => t.trim()).filter(t => t)
+                  setFormData(prev => ({ ...prev, tags }))
+                }}
+                placeholder="e.g., business, personal, urgent (comma separated)"
+                className="form-input"
+              />
+              {formData.tags.length > 0 && (
+                <div className="tags-display">
+                  {formData.tags.map((tag, idx) => (
+                    <span key={idx} className="tag-badge">
+                      {tag}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({
+                            ...prev,
+                            tags: prev.tags.filter((_, i) => i !== idx)
+                          }))
+                        }}
+                        className="tag-remove"
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Expense Splitting */}
+          {viewMode === 'expenses' && !isEditMode && (
+            <div className="form-group">
+              <label className="checkbox-label">
+                <input
+                  type="checkbox"
+                  checked={formData.splitWith.length > 0}
+                  onChange={(e) => {
+                    if (!e.target.checked) {
+                      setFormData(prev => ({ ...prev, splitWith: [] }))
+                    }
+                  }}
+                  className="checkbox-input"
+                />
+                <span>Split this expense</span>
+              </label>
+              {formData.splitWith.length > 0 && (
+                <div className="split-section">
+                  <div className="split-input-group">
+                    <input
+                      type="text"
+                      placeholder="Person name"
+                      className="split-person-input"
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault()
+                          const personName = e.target.value.trim()
+                          if (personName && !formData.splitWith.includes(personName)) {
+                            setFormData(prev => ({
+                              ...prev,
+                              splitWith: [...prev.splitWith, personName]
+                            }))
+                            e.target.value = ''
+                          }
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className="add-split-btn"
+                      onClick={(e) => {
+                        const input = e.target.previousElementSibling
+                        const personName = input.value.trim()
+                        if (personName && !formData.splitWith.includes(personName)) {
+                          setFormData(prev => ({
+                            ...prev,
+                            splitWith: [...prev.splitWith, personName]
+                          }))
+                          input.value = ''
+                        }
+                      }}
+                    >
+                      + Add
+                    </button>
+                  </div>
+                  {formData.splitWith.length > 0 && (
+                    <div className="split-people-list">
+                      <div className="split-info">
+                        Split among {formData.splitWith.length + 1} people (you + {formData.splitWith.length} others)
+                        <br />
+                        <small>Each person: ₹{formData.amount ? (parseFloat(formData.amount) / (formData.splitWith.length + 1)).toFixed(2) : '0.00'}</small>
+                      </div>
+                      <div className="split-tags">
+                        {formData.splitWith.map((person, idx) => (
+                          <span key={idx} className="split-tag">
+                            {person}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFormData(prev => ({
+                                  ...prev,
+                                  splitWith: prev.splitWith.filter((_, i) => i !== idx)
+                                }))
+                              }}
+                              className="split-remove"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Receipt/Image Attachment */}
+          {viewMode !== 'credits' && (
+            <div className="form-group">
+              <label htmlFor="receipt">Receipt/Image (Optional)</label>
+              <input
+                type="file"
+                id="receipt"
+                name="receipt"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files[0]
+                  if (file) {
+                    // Convert to base64 for storage
+                    const reader = new FileReader()
+                    reader.onloadend = () => {
+                      setFormData(prev => ({
+                        ...prev,
+                        receiptImage: reader.result
+                      }))
+                    }
+                    reader.readAsDataURL(file)
+                  }
+                }}
+                className="form-input file-input"
+              />
+              {formData.receiptImage && (
+                <div className="receipt-preview">
+                  <img src={formData.receiptImage} alt="Receipt preview" className="receipt-image" />
+                  <button
+                    type="button"
+                    className="remove-receipt-btn"
+                    onClick={() => setFormData(prev => ({ ...prev, receiptImage: null }))}
+                  >
+                    Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Recurring Options - Only for expenses and income, not credits */}
+          {viewMode !== 'credits' && !isEditMode && (
+            <>
+              <div className="form-group">
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    name="isRecurring"
+                    checked={formData.isRecurring}
+                    onChange={(e) => setFormData(prev => ({ ...prev, isRecurring: e.target.checked }))}
+                    className="checkbox-input"
+                  />
+                  <span>Make this recurring</span>
+                </label>
+              </div>
+
+              {formData.isRecurring && (
+                <div className="recurring-options">
+                  <div className="form-group">
+                    <label htmlFor="frequency">Frequency *</label>
+                    <select
+                      id="frequency"
+                      name="frequency"
+                      value={formData.frequency}
+                      onChange={handleChange}
+                      required={formData.isRecurring}
+                      className="form-input"
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="startDate">Start Date *</label>
+                    <input
+                      type="date"
+                      id="startDate"
+                      name="startDate"
+                      value={formData.startDate}
+                      onChange={handleChange}
+                      required={formData.isRecurring}
+                      className="form-input"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label htmlFor="endDate">End Date (Optional)</label>
+                    <input
+                      type="date"
+                      id="endDate"
+                      name="endDate"
+                      value={formData.endDate}
+                      onChange={handleChange}
+                      className="form-input"
+                    />
+                    <small className="form-hint">Leave empty for no end date</small>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
 
           <div className="modal-actions">
             <button type="button" className="btn-cancel" onClick={handleClose}>

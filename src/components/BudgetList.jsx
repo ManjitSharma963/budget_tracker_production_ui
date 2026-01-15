@@ -1,8 +1,9 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useEffect, useState } from 'react'
 import PieChart from './PieChart'
+import BudgetRecommendations from './BudgetRecommendations'
 import './BudgetList.css'
 
-function BudgetList({ budgets, expenses, monthlyIncome, onAddClick, onEdit, onDelete }) {
+function BudgetList({ budgets, expenses, monthlyIncome, onAddClick, onEdit, onDelete, onAlert, onApplyRecommendation }) {
   const now = new Date()
   const currentMonth = now.getMonth()
   const currentYear = now.getFullYear()
@@ -23,22 +24,90 @@ function BudgetList({ budgets, expenses, monthlyIncome, onAddClick, onEdit, onDe
     return acc
   }, {})
 
-  // Calculate budget progress
+  // Calculate budget progress with alert status
   const budgetProgress = budgets.map(budget => {
     const spent = spendingByCategory[budget.category] || 0
     const budgetAmount = budget.amount || 0
     const remaining = budgetAmount - spent
     const percentage = budgetAmount > 0 ? (spent / budgetAmount) * 100 : 0
     const isOverBudget = spent > budgetAmount
+    const isNearLimit = percentage >= 80 && percentage < 100
+    const isApproaching = percentage >= 60 && percentage < 80
+
+    // Determine status for visual indicators
+    let status = 'safe' // green
+    if (isOverBudget) {
+      status = 'over' // red
+    } else if (isNearLimit) {
+      status = 'warning' // yellow/orange
+    } else if (isApproaching) {
+      status = 'approaching' // light yellow
+    }
 
     return {
       ...budget,
       spent,
       remaining,
       percentage: Math.min(percentage, 100),
-      isOverBudget
+      isOverBudget,
+      isNearLimit,
+      isApproaching,
+      status
     }
   })
+
+  // Track which alerts have been shown to avoid duplicates
+  const [shownAlerts, setShownAlerts] = useState(new Set())
+
+  // Check for alerts and notify parent component
+  useEffect(() => {
+    if (!onAlert) return
+
+    const newAlerts = new Set()
+    
+    budgetProgress.forEach(budget => {
+      const alertKey = `${budget.id}-${budget.status}`
+      
+      // Only show alert if status changed or it's a critical alert
+      if (budget.isOverBudget) {
+        if (!shownAlerts.has(alertKey)) {
+          onAlert({
+            type: 'error',
+            message: `⚠️ Over Budget: ${budget.category} exceeded by ${formatCurrency(Math.abs(budget.remaining))}`,
+            category: budget.category
+          })
+          newAlerts.add(alertKey)
+        }
+      } else if (budget.isNearLimit && budget.percentage >= 80) {
+        if (!shownAlerts.has(alertKey)) {
+          onAlert({
+            type: 'warning',
+            message: `⚠️ Budget Alert: ${budget.category} is ${budget.percentage.toFixed(1)}% spent (${formatCurrency(budget.remaining)} remaining)`,
+            category: budget.category
+          })
+          newAlerts.add(alertKey)
+        }
+      } else if (budget.isApproaching && budget.percentage >= 60 && budget.percentage < 80) {
+        // Only show approaching alert once per session
+        if (!shownAlerts.has(alertKey)) {
+          onAlert({
+            type: 'info',
+            message: `ℹ️ Approaching Limit: ${budget.category} is ${budget.percentage.toFixed(1)}% spent`,
+            category: budget.category
+          })
+          newAlerts.add(alertKey)
+        }
+      }
+      
+      // Keep track of all current alerts
+      if (budget.status !== 'safe') {
+        newAlerts.add(alertKey)
+      }
+    })
+    
+    // Update shown alerts
+    setShownAlerts(newAlerts)
+  }, [budgetProgress, onAlert, shownAlerts])
 
   // Calculate budget distribution for pie chart
   const budgetChartData = useMemo(() => {
@@ -141,9 +210,15 @@ function BudgetList({ budgets, expenses, monthlyIncome, onAddClick, onEdit, onDe
 
       <div className="budgets-grid">
         {budgetProgress.map(budget => (
-          <div key={budget.id} className="budget-card">
+          <div key={budget.id} className={`budget-card budget-card-${budget.status}`}>
             <div className="budget-card-header">
-              <div className="budget-category-name">{budget.category}</div>
+              <div className="budget-category-name">
+                {budget.category}
+                {budget.status === 'over' && <span className="status-badge status-over">OVER</span>}
+                {budget.status === 'warning' && <span className="status-badge status-warning">WARNING</span>}
+                {budget.status === 'approaching' && <span className="status-badge status-approaching">APPROACHING</span>}
+                {budget.status === 'safe' && <span className="status-badge status-safe">SAFE</span>}
+              </div>
               <div className="budget-card-actions">
                 <button 
                   className="icon-btn" 
@@ -191,7 +266,7 @@ function BudgetList({ budgets, expenses, monthlyIncome, onAddClick, onEdit, onDe
 
             <div className="budget-progress-bar-container">
               <div 
-                className={`budget-progress-bar ${budget.isOverBudget ? 'over-budget' : ''}`}
+                className={`budget-progress-bar budget-progress-${budget.status}`}
                 style={{ width: `${Math.min(budget.percentage, 100)}%` }}
               >
                 <span className="progress-text">
@@ -201,8 +276,18 @@ function BudgetList({ budgets, expenses, monthlyIncome, onAddClick, onEdit, onDe
             </div>
 
             {budget.isOverBudget && (
-              <div className="budget-warning">
+              <div className="budget-warning budget-warning-over">
                 ⚠️ Over budget by {formatCurrency(Math.abs(budget.remaining))}
+              </div>
+            )}
+            {budget.isNearLimit && !budget.isOverBudget && (
+              <div className="budget-warning budget-warning-near">
+                ⚠️ {budget.percentage.toFixed(1)}% spent - {formatCurrency(budget.remaining)} remaining
+              </div>
+            )}
+            {budget.isApproaching && !budget.isNearLimit && (
+              <div className="budget-warning budget-warning-approaching">
+                ℹ️ Approaching limit - {formatCurrency(budget.remaining)} remaining
               </div>
             )}
           </div>

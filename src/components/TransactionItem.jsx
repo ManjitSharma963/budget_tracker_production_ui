@@ -1,5 +1,6 @@
 import React from 'react'
 import SwipeableItem from './SwipeableItem'
+import { getTransactionAriaLabel } from '../utils/accessibility'
 import './TransactionItem.css'
 
 const categoryIcons = {
@@ -14,7 +15,7 @@ const categoryIcons = {
   'Shopping': '🛒'
 }
 
-function TransactionItem({ transaction, onEdit, onDelete }) {
+function TransactionItem({ transaction, onEdit, onDelete, onDuplicate, onDeleteRequest }) {
   const isExpense = transaction.type === 'expense'
   const amountClass = isExpense ? 'amount expense' : 'amount income'
   const displayAmount = isExpense 
@@ -28,10 +29,21 @@ function TransactionItem({ transaction, onEdit, onDelete }) {
 
   const handleDelete = (e) => {
     e.stopPropagation()
-    if (window.confirm(`Are you sure you want to delete "${transaction.description}"?`)) {
+    if (onDeleteRequest) {
+      onDeleteRequest(transaction)
+    } else if (onDelete) {
       onDelete(transaction.id)
     }
   }
+
+  const handleDuplicate = (e) => {
+    e.stopPropagation()
+    if (onDuplicate) {
+      onDuplicate(transaction)
+    }
+  }
+
+  const ariaLabel = getTransactionAriaLabel(transaction)
 
   return (
     <SwipeableItem
@@ -40,7 +52,11 @@ function TransactionItem({ transaction, onEdit, onDelete }) {
       onEdit={handleEdit}
       onDelete={handleDelete}
     >
-      <div className="transaction-item">
+      <div 
+        className="transaction-item"
+        role="article"
+        aria-label={ariaLabel}
+      >
         <div className="transaction-icon">
           {categoryIcons[transaction.category] || '📝'}
         </div>
@@ -55,10 +71,28 @@ function TransactionItem({ transaction, onEdit, onDelete }) {
         <div className="transaction-actions">
           <div className={amountClass}>{displayAmount}</div>
           <div className="action-buttons">
-            <button className="edit-btn" onClick={handleEdit} title="Edit">
+            <button 
+              className="duplicate-btn" 
+              onClick={handleDuplicate} 
+              title="Duplicate"
+              aria-label={`Duplicate ${transaction.description}`}
+            >
+              📋
+            </button>
+            <button 
+              className="edit-btn" 
+              onClick={handleEdit} 
+              title="Edit"
+              aria-label={`Edit ${transaction.description}`}
+            >
               ✏️
             </button>
-            <button className="delete-btn" onClick={handleDelete} title="Delete">
+            <button 
+              className="delete-btn" 
+              onClick={handleDelete} 
+              title="Delete"
+              aria-label={`Delete ${transaction.description}`}
+            >
               🗑️
             </button>
           </div>
