@@ -42,7 +42,7 @@ function AddTaskModal({ isOpen, onClose, onSubmit, editTask = null, existingTask
     if (!startTime || !endTime) return null;
     
     // Filter tasks for the same date, excluding the task being edited
-    const sameDateTasks = existingTasks.filter(task => {
+    const sameDateTasks = (existingTasks || []).filter(task => {
       if (task.date !== date) return false;
       if (editTask && task.id === editTask.id) return false;
       if (!task.startTime || !task.endTime) return false;

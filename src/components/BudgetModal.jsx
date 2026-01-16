@@ -18,7 +18,7 @@ function BudgetModal({ isOpen, onClose, onSubmit, budgets = [], monthlyIncome = 
   
   // Get all unique categories from existing budgets (including custom ones)
   const getAllCategories = () => {
-    const budgetCategories = budgets.map(b => b.category).filter(Boolean)
+    const budgetCategories = (budgets || []).map(b => b.category).filter(Boolean)
     const allCategories = [...new Set([...expenseCategories, ...budgetCategories])].sort()
     return allCategories
   }
@@ -191,7 +191,7 @@ function BudgetModal({ isOpen, onClose, onSubmit, budgets = [], monthlyIncome = 
   if (!isOpen) return null
 
   const availableCategories = getAllCategories().filter(cat => 
-    !budgets.some(b => b.category === cat && b.id !== editingBudget?.id)
+    !(budgets || []).some(b => b.category === cat && b.id !== editingBudget?.id)
   )
 
   return (
@@ -220,7 +220,7 @@ function BudgetModal({ isOpen, onClose, onSubmit, budgets = [], monthlyIncome = 
               ) : (
                 <>
                   {getAllCategories().filter(cat => 
-                    !budgets.some(b => b.category === cat && b.id !== editingBudget?.id)
+                    !(budgets || []).some(b => b.category === cat && b.id !== editingBudget?.id)
                   ).map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}

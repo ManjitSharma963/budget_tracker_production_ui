@@ -62,8 +62,8 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
   
   // Show recent categories first, then others
   const categories = [
-    ...recentCategories.filter(cat => allCategories.includes(cat)),
-    ...allCategories.filter(cat => !recentCategories.includes(cat))
+    ...(recentCategories || []).filter(cat => allCategories.includes(cat)),
+    ...allCategories.filter(cat => !(recentCategories || []).includes(cat))
   ]
   const creditTypes = ['BORROWED', 'LENT']
   const isEditMode = !!editTransaction
@@ -101,7 +101,10 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
           note: editTransaction.note || '',
           paymentMode: 'Cash',
           category: '',
-          customCategory: ''
+          customCategory: '',
+          tags: [],
+          splitWith: [],
+          receiptImage: null
         })
       } else {
         const category = editTransaction.category || ''
@@ -118,7 +121,10 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
           isRecurring: false,
           frequency: 'monthly',
           startDate: new Date().toISOString().split('T')[0],
-          endDate: ''
+          endDate: '',
+          tags: editTransaction.tags || [],
+          splitWith: editTransaction.splitWith || [],
+          receiptImage: editTransaction.receiptImage || null
         })
         setShowCustomCategory(isCustomCategory)
       }
@@ -137,7 +143,10 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
         isRecurring: false,
         frequency: 'monthly',
         startDate: new Date().toISOString().split('T')[0],
-        endDate: ''
+        endDate: '',
+        tags: [],
+        splitWith: [],
+        receiptImage: null
       })
       setShowCustomCategory(false)
       setAutoDetectedCategory(null)
@@ -260,7 +269,10 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
       isRecurring: false,
       frequency: 'monthly',
       startDate: new Date().toISOString().split('T')[0],
-      endDate: ''
+      endDate: '',
+      tags: [],
+      splitWith: [],
+      receiptImage: null
     })
     setShowCustomCategory(false)
     setAutoDetectedCategory(null)
@@ -315,7 +327,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
         
         <form className="modal-form" onSubmit={handleSubmit}>
           {/* Quick Add Templates */}
-          {!isEditMode && templates.length > 0 && viewMode !== 'credits' && (
+          {!isEditMode && templates && templates.length > 0 && viewMode !== 'credits' && (
             <div className="quick-add-section">
               <div className="quick-add-header">
                 <label>Quick Add from Templates</label>
@@ -329,7 +341,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
               </div>
               {showTemplates && (
                 <div className="templates-grid">
-                  {templates.map(template => (
+                  {(templates || []).map(template => (
                     <button
                       key={template.id}
                       type="button"
@@ -509,7 +521,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
                 type="text"
                 id="tags"
                 name="tags"
-                value={formData.tags.join(', ')}
+                value={formData.tags ? formData.tags.join(', ') : ''}
                 onChange={(e) => {
                   const tagString = e.target.value
                   const tags = tagString.split(',').map(t => t.trim()).filter(t => t)
@@ -518,7 +530,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
                 placeholder="e.g., business, personal, urgent (comma separated)"
                 className="form-input"
               />
-              {formData.tags.length > 0 && (
+              {formData.tags && formData.tags.length > 0 && (
                 <div className="tags-display">
                   {formData.tags.map((tag, idx) => (
                     <span key={idx} className="tag-badge">
@@ -548,7 +560,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
               <label className="checkbox-label">
                 <input
                   type="checkbox"
-                  checked={formData.splitWith.length > 0}
+                  checked={formData.splitWith && formData.splitWith.length > 0}
                   onChange={(e) => {
                     if (!e.target.checked) {
                       setFormData(prev => ({ ...prev, splitWith: [] }))
@@ -558,7 +570,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
                 />
                 <span>Split this expense</span>
               </label>
-              {formData.splitWith.length > 0 && (
+              {formData.splitWith && formData.splitWith.length > 0 && (
                 <div className="split-section">
                   <div className="split-input-group">
                     <input
@@ -569,10 +581,10 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
                         if (e.key === 'Enter') {
                           e.preventDefault()
                           const personName = e.target.value.trim()
-                          if (personName && !formData.splitWith.includes(personName)) {
+                          if (personName && (!formData.splitWith || !formData.splitWith.includes(personName))) {
                             setFormData(prev => ({
                               ...prev,
-                              splitWith: [...prev.splitWith, personName]
+                              splitWith: [...(prev.splitWith || []), personName]
                             }))
                             e.target.value = ''
                           }
@@ -585,10 +597,10 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
                       onClick={(e) => {
                         const input = e.target.previousElementSibling
                         const personName = input.value.trim()
-                        if (personName && !formData.splitWith.includes(personName)) {
+                        if (personName && (!formData.splitWith || !formData.splitWith.includes(personName))) {
                           setFormData(prev => ({
                             ...prev,
-                            splitWith: [...prev.splitWith, personName]
+                            splitWith: [...(prev.splitWith || []), personName]
                           }))
                           input.value = ''
                         }
@@ -597,7 +609,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
                       + Add
                     </button>
                   </div>
-                  {formData.splitWith.length > 0 && (
+                  {formData.splitWith && formData.splitWith.length > 0 && (
                     <div className="split-people-list">
                       <div className="split-info">
                         Split among {formData.splitWith.length + 1} people (you + {formData.splitWith.length} others)
@@ -613,7 +625,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
                               onClick={() => {
                                 setFormData(prev => ({
                                   ...prev,
-                                  splitWith: prev.splitWith.filter((_, i) => i !== idx)
+                                  splitWith: (prev.splitWith || []).filter((_, i) => i !== idx)
                                 }))
                               }}
                               className="split-remove"
