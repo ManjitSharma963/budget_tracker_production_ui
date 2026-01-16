@@ -144,6 +144,20 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
     }
   }, [editTransaction, isOpen, viewMode, categories])
 
+  // Focus trap for accessibility
+  React.useEffect(() => {
+    if (isOpen) {
+      const modal = document.querySelector('.modal-content')
+      if (modal) {
+        const firstInput = modal.querySelector('input, select, textarea, button')
+        if (firstInput) {
+          setTimeout(() => firstInput.focus(), 100)
+        }
+      }
+    }
+  }, [isOpen])
+
+  // Early return AFTER all hooks - this is critical for React Hooks rules
   if (!isOpen) return null
 
   const handleChange = (e) => {
@@ -275,21 +289,6 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
     setAutoDetectedCategory(null)
     onClose()
   }
-
-  // Focus trap for accessibility
-  React.useEffect(() => {
-    if (isOpen) {
-      const modal = document.querySelector('.modal-content')
-      if (modal) {
-        const firstInput = modal.querySelector('input, select, textarea, button')
-        if (firstInput) {
-          setTimeout(() => firstInput.focus(), 100)
-        }
-      }
-    }
-  }, [isOpen])
-
-  if (!isOpen) return null
 
   return (
     <div 
