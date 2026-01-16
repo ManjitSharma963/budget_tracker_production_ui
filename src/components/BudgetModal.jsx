@@ -195,8 +195,8 @@ function BudgetModal({ isOpen, onClose, onSubmit, budgets = [], monthlyIncome = 
   )
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content budget-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={onClose} style={{ pointerEvents: 'auto' }}>
+      <div className="modal-content budget-modal" onClick={(e) => e.stopPropagation()} style={{ pointerEvents: 'auto' }}>
         <div className="modal-header">
           <h2>{editingBudget ? 'Edit Budget' : 'Add Budget'}</h2>
           <button className="close-btn" onClick={onClose}>×</button>

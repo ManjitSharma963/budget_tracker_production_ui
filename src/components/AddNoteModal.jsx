@@ -64,8 +64,8 @@ function AddNoteModal({ isOpen, onClose, onSubmit, editNote = null }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal-content note-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={handleClose} style={{ pointerEvents: 'auto' }}>
+      <div className="modal-content note-modal" onClick={(e) => e.stopPropagation()} style={{ pointerEvents: 'auto' }}>
         <div className="modal-header">
           <h2>{isEditMode ? 'Edit Note' : 'Add New Note'}</h2>
           <button className="close-btn" onClick={handleClose}>×</button>

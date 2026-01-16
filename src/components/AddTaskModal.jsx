@@ -176,8 +176,8 @@ function AddTaskModal({ isOpen, onClose, onSubmit, editTask = null, existingTask
   }
 
   return (
-    <div className="modal-overlay" onClick={handleClose}>
-      <div className="modal-content task-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={handleClose} style={{ pointerEvents: 'auto' }}>
+      <div className="modal-content task-modal" onClick={(e) => e.stopPropagation()} style={{ pointerEvents: 'auto' }}>
         <div className="modal-header">
           <h2>{isEditMode ? 'Edit Task' : 'Add New Task'}</h2>
           <button className="close-btn" onClick={handleClose}>×</button>

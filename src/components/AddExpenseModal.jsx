@@ -88,6 +88,9 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
   const [showCustomCategory, setShowCustomCategory] = useState(false)
   const [autoDetectedCategory, setAutoDetectedCategory] = useState(null)
   const [showTemplates, setShowTemplates] = useState(false)
+  const [showTags, setShowTags] = useState(false)
+  const [showReceipt, setShowReceipt] = useState(false)
+  const [showRecurring, setShowRecurring] = useState(false)
 
   // Populate form when editing
   React.useEffect(() => {
@@ -150,6 +153,9 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
       })
       setShowCustomCategory(false)
       setAutoDetectedCategory(null)
+      setShowTags(false)
+      setShowReceipt(false)
+      setShowRecurring(false)
     }
   }, [editTransaction, isOpen, viewMode, categories])
 
@@ -276,6 +282,9 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
     })
     setShowCustomCategory(false)
     setAutoDetectedCategory(null)
+    setShowTags(false)
+    setShowReceipt(false)
+    setShowRecurring(false)
     onClose()
   }
 
@@ -299,6 +308,9 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
     })
     setShowCustomCategory(false)
     setAutoDetectedCategory(null)
+    setShowTags(false)
+    setShowReceipt(false)
+    setShowRecurring(false)
     onClose()
   }
 
@@ -309,11 +321,13 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
+      style={{ pointerEvents: 'auto' }}
     >
       <div 
         className="modal-content" 
         onClick={(e) => e.stopPropagation()}
         role="document"
+        style={{ pointerEvents: 'auto' }}
       >
         <div className="modal-header">
           <h2 className="modal-title">
@@ -513,43 +527,68 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
             />
           </div>
 
-          {/* Tags */}
+          {/* Tags - Collapsible */}
           {viewMode !== 'credits' && (
             <div className="form-group">
-              <label htmlFor="tags">Tags (Optional)</label>
-              <input
-                type="text"
-                id="tags"
-                name="tags"
-                value={formData.tags ? formData.tags.join(', ') : ''}
-                onChange={(e) => {
-                  const tagString = e.target.value
-                  const tags = tagString.split(',').map(t => t.trim()).filter(t => t)
-                  setFormData(prev => ({ ...prev, tags }))
-                }}
-                placeholder="e.g., business, personal, urgent (comma separated)"
-                className="form-input"
-              />
-              {formData.tags && formData.tags.length > 0 && (
-                <div className="tags-display">
-                  {formData.tags.map((tag, idx) => (
-                    <span key={idx} className="tag-badge">
-                      {tag}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFormData(prev => ({
-                            ...prev,
-                            tags: prev.tags.filter((_, i) => i !== idx)
-                          }))
-                        }}
-                        className="tag-remove"
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showTags ? '8px' : '0' }}>
+                <label htmlFor="tags" style={{ marginBottom: 0 }}>Tags (Optional)</label>
+                <button
+                  type="button"
+                  onClick={() => setShowTags(!showTags)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#667eea',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
+                  onMouseLeave={(e) => e.target.style.background = 'none'}
+                >
+                  {showTags ? '▼ Hide' : '▶ Show'}
+                </button>
+              </div>
+              {showTags && (
+                <>
+                  <input
+                    type="text"
+                    id="tags"
+                    name="tags"
+                    value={formData.tags ? formData.tags.join(', ') : ''}
+                    onChange={(e) => {
+                      const tagString = e.target.value
+                      const tags = tagString.split(',').map(t => t.trim()).filter(t => t)
+                      setFormData(prev => ({ ...prev, tags }))
+                    }}
+                    placeholder="e.g., business, personal, urgent (comma separated)"
+                    className="form-input"
+                  />
+                  {formData.tags && formData.tags.length > 0 && (
+                    <div className="tags-display">
+                      {formData.tags.map((tag, idx) => (
+                        <span key={idx} className="tag-badge">
+                          {tag}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormData(prev => ({
+                                ...prev,
+                                tags: prev.tags.filter((_, i) => i !== idx)
+                              }))
+                            }}
+                            className="tag-remove"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -642,109 +681,167 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
             </div>
           )}
 
-          {/* Receipt/Image Attachment */}
+          {/* Receipt/Image Attachment - Collapsible */}
           {viewMode !== 'credits' && (
             <div className="form-group">
-              <label htmlFor="receipt">Receipt/Image (Optional)</label>
-              <input
-                type="file"
-                id="receipt"
-                name="receipt"
-                accept="image/*"
-                onChange={(e) => {
-                  const file = e.target.files[0]
-                  if (file) {
-                    // Convert to base64 for storage
-                    const reader = new FileReader()
-                    reader.onloadend = () => {
-                      setFormData(prev => ({
-                        ...prev,
-                        receiptImage: reader.result
-                      }))
-                    }
-                    reader.readAsDataURL(file)
-                  }
-                }}
-                className="form-input file-input"
-              />
-              {formData.receiptImage && (
-                <div className="receipt-preview">
-                  <img src={formData.receiptImage} alt="Receipt preview" className="receipt-image" />
-                  <button
-                    type="button"
-                    className="remove-receipt-btn"
-                    onClick={() => setFormData(prev => ({ ...prev, receiptImage: null }))}
-                  >
-                    Remove
-                  </button>
-                </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showReceipt ? '8px' : '0' }}>
+                <label htmlFor="receipt" style={{ marginBottom: 0 }}>Receipt/Image (Optional)</label>
+                <button
+                  type="button"
+                  onClick={() => setShowReceipt(!showReceipt)}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#667eea',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
+                  onMouseLeave={(e) => e.target.style.background = 'none'}
+                >
+                  {showReceipt ? '▼ Hide' : '▶ Show'}
+                </button>
+              </div>
+              {showReceipt && (
+                <>
+                  <input
+                    type="file"
+                    id="receipt"
+                    name="receipt"
+                    accept="image/*"
+                    onChange={(e) => {
+                      const file = e.target.files[0]
+                      if (file) {
+                        // Convert to base64 for storage
+                        const reader = new FileReader()
+                        reader.onloadend = () => {
+                          setFormData(prev => ({
+                            ...prev,
+                            receiptImage: reader.result
+                          }))
+                        }
+                        reader.readAsDataURL(file)
+                      }
+                    }}
+                    className="form-input file-input"
+                  />
+                  {formData.receiptImage && (
+                    <div className="receipt-preview">
+                      <img src={formData.receiptImage} alt="Receipt preview" className="receipt-image" />
+                      <button
+                        type="button"
+                        className="remove-receipt-btn"
+                        onClick={() => setFormData(prev => ({ ...prev, receiptImage: null }))}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
 
-          {/* Recurring Options - Only for expenses and income, not credits */}
+          {/* Recurring Options - Collapsible - Only for expenses and income, not credits */}
           {viewMode !== 'credits' && !isEditMode && (
-            <>
-              <div className="form-group">
-                <label className="checkbox-label">
-                  <input
-                    type="checkbox"
-                    name="isRecurring"
-                    checked={formData.isRecurring}
-                    onChange={(e) => setFormData(prev => ({ ...prev, isRecurring: e.target.checked }))}
-                    className="checkbox-input"
-                  />
-                  <span>Make this recurring</span>
-                </label>
+            <div className="form-group">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showRecurring ? '8px' : '0' }}>
+                <label style={{ marginBottom: 0 }}>Make this recurring (Optional)</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRecurring(!showRecurring)
+                    if (!showRecurring) {
+                      setFormData(prev => ({ ...prev, isRecurring: true }))
+                    } else {
+                      setFormData(prev => ({ ...prev, isRecurring: false, frequency: 'monthly', startDate: new Date().toISOString().split('T')[0], endDate: '' }))
+                    }
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#667eea',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    transition: 'all 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
+                  onMouseLeave={(e) => e.target.style.background = 'none'}
+                >
+                  {showRecurring ? '▼ Hide' : '▶ Show'}
+                </button>
               </div>
-
-              {formData.isRecurring && (
+              {showRecurring && (
                 <div className="recurring-options">
                   <div className="form-group">
-                    <label htmlFor="frequency">Frequency *</label>
-                    <select
-                      id="frequency"
-                      name="frequency"
-                      value={formData.frequency}
-                      onChange={handleChange}
-                      required={formData.isRecurring}
-                      className="form-input"
-                    >
-                      <option value="daily">Daily</option>
-                      <option value="weekly">Weekly</option>
-                      <option value="monthly">Monthly</option>
-                      <option value="yearly">Yearly</option>
-                    </select>
+                    <label className="checkbox-label" style={{ marginBottom: '8px' }}>
+                      <input
+                        type="checkbox"
+                        name="isRecurring"
+                        checked={formData.isRecurring}
+                        onChange={(e) => setFormData(prev => ({ ...prev, isRecurring: e.target.checked }))}
+                        className="checkbox-input"
+                      />
+                      <span>Enable recurring</span>
+                    </label>
                   </div>
 
-                  <div className="form-group">
-                    <label htmlFor="startDate">Start Date *</label>
-                    <input
-                      type="date"
-                      id="startDate"
-                      name="startDate"
-                      value={formData.startDate}
-                      onChange={handleChange}
-                      required={formData.isRecurring}
-                      className="form-input"
-                    />
-                  </div>
+                  {formData.isRecurring && (
+                    <>
+                      <div className="form-group">
+                        <label htmlFor="frequency">Frequency *</label>
+                        <select
+                          id="frequency"
+                          name="frequency"
+                          value={formData.frequency}
+                          onChange={handleChange}
+                          required={formData.isRecurring}
+                          className="form-input"
+                        >
+                          <option value="daily">Daily</option>
+                          <option value="weekly">Weekly</option>
+                          <option value="monthly">Monthly</option>
+                          <option value="yearly">Yearly</option>
+                        </select>
+                      </div>
 
-                  <div className="form-group">
-                    <label htmlFor="endDate">End Date (Optional)</label>
-                    <input
-                      type="date"
-                      id="endDate"
-                      name="endDate"
-                      value={formData.endDate}
-                      onChange={handleChange}
-                      className="form-input"
-                    />
-                    <small className="form-hint">Leave empty for no end date</small>
-                  </div>
+                      <div className="form-group">
+                        <label htmlFor="startDate">Start Date *</label>
+                        <input
+                          type="date"
+                          id="startDate"
+                          name="startDate"
+                          value={formData.startDate}
+                          onChange={handleChange}
+                          required={formData.isRecurring}
+                          className="form-input"
+                        />
+                      </div>
+
+                      <div className="form-group">
+                        <label htmlFor="endDate">End Date (Optional)</label>
+                        <input
+                          type="date"
+                          id="endDate"
+                          name="endDate"
+                          value={formData.endDate}
+                          onChange={handleChange}
+                          className="form-input"
+                        />
+                        <small className="form-hint">Leave empty for no end date</small>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
-            </>
+            </div>
           )}
 
           <div className="modal-actions">

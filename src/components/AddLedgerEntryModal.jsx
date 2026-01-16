@@ -97,8 +97,8 @@ function AddLedgerEntryModal({ isOpen, onClose, onSubmit, party, editEntry = nul
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content ledger-entry-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={onClose} style={{ pointerEvents: 'auto' }}>
+      <div className="modal-content ledger-entry-modal" onClick={(e) => e.stopPropagation()} style={{ pointerEvents: 'auto' }}>
         <div className="modal-header">
           <h2>{isEditMode ? 'Edit Ledger Entry' : isPaymentMode ? 'Add Payment' : 'Add Ledger Entry'}</h2>
           <button className="close-button" onClick={onClose}>×</button>

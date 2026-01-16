@@ -98,8 +98,8 @@ function SavingsGoalModal({ isOpen, onClose, onSubmit, editGoal = null }) {
   if (!isOpen) return null
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-content savings-goal-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-overlay" onClick={onClose} style={{ pointerEvents: 'auto' }}>
+      <div className="modal-content savings-goal-modal" onClick={(e) => e.stopPropagation()} style={{ pointerEvents: 'auto' }}>
         <div className="modal-header">
           <h2>{editGoal ? 'Edit Savings Goal' : 'Add Savings Goal'}</h2>
           <button className="close-btn" onClick={onClose}>×</button>
