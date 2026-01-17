@@ -60,11 +60,11 @@ const detectCategory = (text) => {
 function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction = null, recentCategories = [], templates = [] }) {
   const allCategories = viewMode === 'expenses' ? expenseCategories : incomeCategories
   
-  // Show recent categories first, then others
-  const categories = [
+  // Show recent categories first, then others - memoized to prevent unnecessary re-renders
+  const categories = useMemo(() => [
     ...(recentCategories || []).filter(cat => allCategories.includes(cat)),
     ...allCategories.filter(cat => !(recentCategories || []).includes(cat))
-  ]
+  ], [recentCategories, viewMode])
   const creditTypes = ['BORROWED', 'LENT']
   const isEditMode = !!editTransaction
   
