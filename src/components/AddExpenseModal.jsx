@@ -112,10 +112,14 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
       } else {
         const category = editTransaction.category || ''
         const isCustomCategory = !categories.includes(category)
+        // Ensure paymentMode matches one of the valid options
+        const validPaymentMode = paymentModes.includes(editTransaction.paymentMode) 
+          ? editTransaction.paymentMode 
+          : 'Cash'
         setFormData({
           date: editTransaction.date || new Date().toISOString().split('T')[0],
           amount: editTransaction.amount || '',
-          paymentMode: editTransaction.paymentMode || 'Cash',
+          paymentMode: validPaymentMode,
           category: isCustomCategory ? (viewMode === 'expenses' ? 'Custom' : 'Other Add Income Type') : category,
           customCategory: isCustomCategory ? category : '',
           note: editTransaction.note || '',
@@ -270,7 +274,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
       category: '',
       customCategory: '',
       note: '',
-      creditType: 'Borrowed',
+      creditType: 'BORROWED',
       personName: '',
       isRecurring: false,
       frequency: 'monthly',
@@ -296,7 +300,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
       category: '',
       customCategory: '',
       note: '',
-      creditType: 'Borrowed',
+      creditType: 'BORROWED',
       personName: '',
       isRecurring: false,
       frequency: 'monthly',
@@ -317,17 +321,19 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
   return (
     <div 
       className="modal-overlay" 
-      onClick={handleClose}
+      onClick={(e) => {
+        // Only close if clicking directly on overlay background
+        if (e.target === e.currentTarget) {
+          handleClose()
+        }
+      }}
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
-      style={{ pointerEvents: 'auto' }}
     >
       <div 
-        className="modal-content" 
+        className="modal-content"
         onClick={(e) => e.stopPropagation()}
-        role="document"
-        style={{ pointerEvents: 'auto' }}
       >
         <div className="modal-header">
           <h2 className="modal-title">
@@ -339,7 +345,10 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
           <button className="modal-close" onClick={handleClose}>×</button>
         </div>
         
-        <form className="modal-form" onSubmit={handleSubmit}>
+        <form 
+          className="modal-form" 
+          onSubmit={handleSubmit}
+        >
           {/* Quick Add Templates */}
           {!isEditMode && templates && templates.length > 0 && viewMode !== 'credits' && (
             <div className="quick-add-section">
@@ -421,7 +430,7 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
                 name="personName"
                 value={formData.personName}
                 onChange={handleChange}
-                placeholder={formData.creditType === 'Borrowed' ? 'Who did you borrow from?' : 'Who did you lend to?'}
+                placeholder={formData.creditType === 'BORROWED' ? 'Who did you borrow from?' : 'Who did you lend to?'}
                 required
                 className="form-input"
               />
@@ -526,324 +535,6 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
               className="form-input form-textarea"
             />
           </div>
-
-          {/* Tags - Collapsible */}
-          {viewMode !== 'credits' && (
-            <div className="form-group">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showTags ? '8px' : '0' }}>
-                <label htmlFor="tags" style={{ marginBottom: 0 }}>Tags (Optional)</label>
-                <button
-                  type="button"
-                  onClick={() => setShowTags(!showTags)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#667eea',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    padding: '4px 8px',
-                    borderRadius: '6px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
-                  onMouseLeave={(e) => e.target.style.background = 'none'}
-                >
-                  {showTags ? '▼ Hide' : '▶ Show'}
-                </button>
-              </div>
-              {showTags && (
-                <>
-                  <input
-                    type="text"
-                    id="tags"
-                    name="tags"
-                    value={formData.tags ? formData.tags.join(', ') : ''}
-                    onChange={(e) => {
-                      const tagString = e.target.value
-                      const tags = tagString.split(',').map(t => t.trim()).filter(t => t)
-                      setFormData(prev => ({ ...prev, tags }))
-                    }}
-                    placeholder="e.g., business, personal, urgent (comma separated)"
-                    className="form-input"
-                  />
-                  {formData.tags && formData.tags.length > 0 && (
-                    <div className="tags-display">
-                      {formData.tags.map((tag, idx) => (
-                        <span key={idx} className="tag-badge">
-                          {tag}
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFormData(prev => ({
-                                ...prev,
-                                tags: prev.tags.filter((_, i) => i !== idx)
-                              }))
-                            }}
-                            className="tag-remove"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Expense Splitting */}
-          {viewMode === 'expenses' && !isEditMode && (
-            <div className="form-group">
-              <label className="checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={formData.splitWith && formData.splitWith.length > 0}
-                  onChange={(e) => {
-                    if (!e.target.checked) {
-                      setFormData(prev => ({ ...prev, splitWith: [] }))
-                    }
-                  }}
-                  className="checkbox-input"
-                />
-                <span>Split this expense</span>
-              </label>
-              {formData.splitWith && formData.splitWith.length > 0 && (
-                <div className="split-section">
-                  <div className="split-input-group">
-                    <input
-                      type="text"
-                      placeholder="Person name"
-                      className="split-person-input"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          const personName = e.target.value.trim()
-                          if (personName && (!formData.splitWith || !formData.splitWith.includes(personName))) {
-                            setFormData(prev => ({
-                              ...prev,
-                              splitWith: [...(prev.splitWith || []), personName]
-                            }))
-                            e.target.value = ''
-                          }
-                        }
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="add-split-btn"
-                      onClick={(e) => {
-                        const input = e.target.previousElementSibling
-                        const personName = input.value.trim()
-                        if (personName && (!formData.splitWith || !formData.splitWith.includes(personName))) {
-                          setFormData(prev => ({
-                            ...prev,
-                            splitWith: [...(prev.splitWith || []), personName]
-                          }))
-                          input.value = ''
-                        }
-                      }}
-                    >
-                      + Add
-                    </button>
-                  </div>
-                  {formData.splitWith && formData.splitWith.length > 0 && (
-                    <div className="split-people-list">
-                      <div className="split-info">
-                        Split among {formData.splitWith.length + 1} people (you + {formData.splitWith.length} others)
-                        <br />
-                        <small>Each person: ₹{formData.amount ? (parseFloat(formData.amount) / (formData.splitWith.length + 1)).toFixed(2) : '0.00'}</small>
-                      </div>
-                      <div className="split-tags">
-                        {formData.splitWith.map((person, idx) => (
-                          <span key={idx} className="split-tag">
-                            {person}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFormData(prev => ({
-                                  ...prev,
-                                  splitWith: (prev.splitWith || []).filter((_, i) => i !== idx)
-                                }))
-                              }}
-                              className="split-remove"
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Receipt/Image Attachment - Collapsible */}
-          {viewMode !== 'credits' && (
-            <div className="form-group">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showReceipt ? '8px' : '0' }}>
-                <label htmlFor="receipt" style={{ marginBottom: 0 }}>Receipt/Image (Optional)</label>
-                <button
-                  type="button"
-                  onClick={() => setShowReceipt(!showReceipt)}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#667eea',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    padding: '4px 8px',
-                    borderRadius: '6px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
-                  onMouseLeave={(e) => e.target.style.background = 'none'}
-                >
-                  {showReceipt ? '▼ Hide' : '▶ Show'}
-                </button>
-              </div>
-              {showReceipt && (
-                <>
-                  <input
-                    type="file"
-                    id="receipt"
-                    name="receipt"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files[0]
-                      if (file) {
-                        // Convert to base64 for storage
-                        const reader = new FileReader()
-                        reader.onloadend = () => {
-                          setFormData(prev => ({
-                            ...prev,
-                            receiptImage: reader.result
-                          }))
-                        }
-                        reader.readAsDataURL(file)
-                      }
-                    }}
-                    className="form-input file-input"
-                  />
-                  {formData.receiptImage && (
-                    <div className="receipt-preview">
-                      <img src={formData.receiptImage} alt="Receipt preview" className="receipt-image" />
-                      <button
-                        type="button"
-                        className="remove-receipt-btn"
-                        onClick={() => setFormData(prev => ({ ...prev, receiptImage: null }))}
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
-          {/* Recurring Options - Collapsible - Only for expenses and income, not credits */}
-          {viewMode !== 'credits' && !isEditMode && (
-            <div className="form-group">
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: showRecurring ? '8px' : '0' }}>
-                <label style={{ marginBottom: 0 }}>Make this recurring (Optional)</label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowRecurring(!showRecurring)
-                    if (!showRecurring) {
-                      setFormData(prev => ({ ...prev, isRecurring: true }))
-                    } else {
-                      setFormData(prev => ({ ...prev, isRecurring: false, frequency: 'monthly', startDate: new Date().toISOString().split('T')[0], endDate: '' }))
-                    }
-                  }}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#667eea',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    padding: '4px 8px',
-                    borderRadius: '6px',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.target.style.background = '#f3f4f6'}
-                  onMouseLeave={(e) => e.target.style.background = 'none'}
-                >
-                  {showRecurring ? '▼ Hide' : '▶ Show'}
-                </button>
-              </div>
-              {showRecurring && (
-                <div className="recurring-options">
-                  <div className="form-group">
-                    <label className="checkbox-label" style={{ marginBottom: '8px' }}>
-                      <input
-                        type="checkbox"
-                        name="isRecurring"
-                        checked={formData.isRecurring}
-                        onChange={(e) => setFormData(prev => ({ ...prev, isRecurring: e.target.checked }))}
-                        className="checkbox-input"
-                      />
-                      <span>Enable recurring</span>
-                    </label>
-                  </div>
-
-                  {formData.isRecurring && (
-                    <>
-                      <div className="form-group">
-                        <label htmlFor="frequency">Frequency *</label>
-                        <select
-                          id="frequency"
-                          name="frequency"
-                          value={formData.frequency}
-                          onChange={handleChange}
-                          required={formData.isRecurring}
-                          className="form-input"
-                        >
-                          <option value="daily">Daily</option>
-                          <option value="weekly">Weekly</option>
-                          <option value="monthly">Monthly</option>
-                          <option value="yearly">Yearly</option>
-                        </select>
-                      </div>
-
-                      <div className="form-group">
-                        <label htmlFor="startDate">Start Date *</label>
-                        <input
-                          type="date"
-                          id="startDate"
-                          name="startDate"
-                          value={formData.startDate}
-                          onChange={handleChange}
-                          required={formData.isRecurring}
-                          className="form-input"
-                        />
-                      </div>
-
-                      <div className="form-group">
-                        <label htmlFor="endDate">End Date (Optional)</label>
-                        <input
-                          type="date"
-                          id="endDate"
-                          name="endDate"
-                          value={formData.endDate}
-                          onChange={handleChange}
-                          className="form-input"
-                        />
-                        <small className="form-hint">Leave empty for no end date</small>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
           <div className="modal-actions">
             <button type="button" className="btn-cancel" onClick={handleClose}>
               Cancel

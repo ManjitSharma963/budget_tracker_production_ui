@@ -77,14 +77,25 @@ function AddPartyModal({ isOpen, onClose, onSubmit, editParty = null }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ pointerEvents: 'auto' }}>
-      <div className="modal-content party-modal" onClick={(e) => e.stopPropagation()} style={{ pointerEvents: 'auto' }}>
+    <div className="modal-overlay" onClick={onClose}>
+      <div 
+        className="modal-content party-modal" 
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h2>{isEditMode ? 'Edit Party' : 'Add New Party'}</h2>
           <button className="close-button" onClick={onClose}>×</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="party-form">
+        <form 
+          onSubmit={handleSubmit} 
+          className="party-form"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
           <div className="form-group">
             <label htmlFor="name">Party Name *</label>
             <input

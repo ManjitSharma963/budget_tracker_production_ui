@@ -24,10 +24,19 @@ function AddLedgerEntryModal({ isOpen, onClose, onSubmit, party, editEntry = nul
 
   useEffect(() => {
     if (editEntry && isOpen) {
+      // Ensure type matches one of the valid entry types
+      const entryTypeValue = editEntry.type || editEntry.transactionType?.toLowerCase() || defaultType
+      const validType = entryTypes.some(et => et.value === entryTypeValue) ? entryTypeValue : defaultType
+      
+      // Ensure paymentMode matches one of the valid payment modes
+      const validPaymentMode = paymentModes.includes(editEntry.paymentMode) 
+        ? editEntry.paymentMode 
+        : 'Cash'
+      
       setFormData({
         date: editEntry.date || editEntry.transactionDate || new Date().toISOString().split('T')[0],
-        type: editEntry.type || editEntry.transactionType?.toLowerCase() || defaultType,
-        paymentMode: editEntry.paymentMode || 'Cash',
+        type: validType,
+        paymentMode: validPaymentMode,
         amount: editEntry.amount?.toString() || '',
         description: editEntry.description || '',
         reference: editEntry.reference || editEntry.referenceNumber || ''
@@ -97,8 +106,13 @@ function AddLedgerEntryModal({ isOpen, onClose, onSubmit, party, editEntry = nul
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ pointerEvents: 'auto' }}>
-      <div className="modal-content ledger-entry-modal" onClick={(e) => e.stopPropagation()} style={{ pointerEvents: 'auto' }}>
+    <div className="modal-overlay" onClick={onClose}>
+      <div 
+        className="modal-content ledger-entry-modal" 
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h2>{isEditMode ? 'Edit Ledger Entry' : isPaymentMode ? 'Add Payment' : 'Add Ledger Entry'}</h2>
           <button className="close-button" onClick={onClose}>×</button>
@@ -110,7 +124,13 @@ function AddLedgerEntryModal({ isOpen, onClose, onSubmit, party, editEntry = nul
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="ledger-entry-form">
+        <form 
+          onSubmit={handleSubmit} 
+          className="ledger-entry-form"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
           <div className="form-group">
             <label htmlFor="date">Date *</label>
             <input

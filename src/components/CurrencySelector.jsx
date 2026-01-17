@@ -1,5 +1,5 @@
 import React from 'react'
-import { getCurrencies, getPreferredCurrency, savePreferredCurrency, formatCurrency } from '../services/currency'
+import { getCurrencies, getPreferredCurrency, savePreferredCurrency } from '../services/currency'
 import './CurrencySelector.css'
 
 function CurrencySelector({ currentCurrency, onCurrencyChange }) {
@@ -28,9 +28,6 @@ function CurrencySelector({ currentCurrency, onCurrencyChange }) {
           </option>
         ))}
       </select>
-      <div className="currency-preview">
-        Sample: {formatCurrency(1000, currentCurrency)}
-      </div>
     </div>
   )
 }

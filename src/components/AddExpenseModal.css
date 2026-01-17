@@ -1,21 +1,24 @@
 .modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.85) 0%, rgba(118, 75, 162, 0.85) 100%);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  inset: 0;
+  background:
+    radial-gradient(circle at top left, rgba(102,126,234,.25), transparent 40%),
+    radial-gradient(circle at bottom right, rgba(118,75,162,.25), transparent 40%),
+    linear-gradient(135deg, rgba(15, 23, 42, 0.65), rgba(15, 23, 42, 0.75));
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10000;
   padding: 20px;
-  animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  -webkit-overflow-scrolling: touch;
   overflow-y: auto;
+  animation: fadeIn 0.35s ease;
+  pointer-events: none;
 }
+
+
+
 
 @keyframes fadeIn {
   from {
@@ -31,22 +34,25 @@
 }
 
 .modal-content {
-  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
-  border-radius: 28px;
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  border-radius: 26px;
   width: 100%;
-  max-width: 480px;
+  max-width: 520px;
   max-height: 90vh;
-  overflow-y: auto;
-  overflow-x: hidden;
-  box-shadow: 
-    0 25px 80px rgba(102, 126, 234, 0.4),
-    0 10px 30px rgba(0, 0, 0, 0.2),
-    0 0 0 1px rgba(255, 255, 255, 0.2) inset,
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  animation: slideUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
   position: relative;
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  z-index: 10001;
+  pointer-events: auto;
+
+  box-shadow:
+    0 40px 80px rgba(0,0,0,.25),
+    0 8px 20px rgba(0,0,0,.12);
+
+  border: 1px solid rgba(255,255,255,.35);
+
+  animation: modalPop .45s cubic-bezier(.2,.8,.2,1);
 }
+
 
 .modal-content::before {
   content: '';
@@ -60,6 +66,8 @@
   border-radius: 28px 28px 0 0;
   animation: shimmer 3s infinite;
   box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  pointer-events: none;
+  z-index: 1;
 }
 
 @keyframes shimmer {
@@ -71,10 +79,10 @@
   }
 }
 
-@keyframes slideUp {
+@keyframes modalPop {
   from {
     opacity: 0;
-    transform: translateY(40px) scale(0.95);
+    transform: translateY(30px) scale(.96);
   }
   to {
     opacity: 1;
@@ -86,28 +94,23 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 24px 28px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 22px 26px;
+  background: rgba(255,255,255,.75);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(0,0,0,.05);
   position: sticky;
   top: 0;
-  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
-  border-radius: 28px 28px 0 0;
-  z-index: 10;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
-  backdrop-filter: blur(10px);
+  z-index: 20;
 }
 
+
 .modal-title {
-  font-size: 24px;
-  font-weight: 800;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin: 0;
-  letter-spacing: -0.5px;
-  text-shadow: 0 2px 10px rgba(102, 126, 234, 0.2);
+  font-size: 22px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: -.3px;
 }
+
 
 .modal-close {
   background: linear-gradient(135deg, #f5f5f5 0%, #e8e8e8 100%);
@@ -167,11 +170,15 @@
 .modal-form {
   padding: 28px;
   position: relative;
+  z-index: 2;
+  pointer-events: auto;
 }
 
 .form-group {
   margin-bottom: 22px;
   animation: fadeInUp 0.5s ease-out both;
+  position: relative;
+  z-index: 1;
 }
 
 .form-group:nth-child(1) { animation-delay: 0.1s; }
@@ -205,33 +212,21 @@
 
 .form-input {
   width: 100%;
-  padding: 14px 18px;
-  border: 2px solid #e8e8e8;
-  border-radius: 14px;
-  font-size: 15px;
-  font-family: inherit;
-  color: #333;
-  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  appearance: none;
-  box-shadow: 
-    0 2px 10px rgba(0, 0, 0, 0.04),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  font-weight: 500;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  font-size: 14px;
+  transition: .25s ease;
 }
 
 .form-input:focus {
   outline: none;
   border-color: #667eea;
-  background: white;
-  box-shadow: 
-    0 0 0 4px rgba(102, 126, 234, 0.12),
-    0 4px 16px rgba(102, 126, 234, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.9);
-  transform: translateY(-2px);
+  box-shadow: 0 0 0 3px rgba(102,126,234,.15);
+  transform: translateY(-1px);
 }
+
 
 select.form-input:focus {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 14 14'%3E%3Cpath fill='%23667eea' d='M7 10L2 5h10z'/%3E%3C/svg%3E") !important;
@@ -650,16 +645,13 @@ select.form-input:hover {
 }
 
 .btn-submit {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  box-shadow: 
-    0 6px 20px rgba(102, 126, 234, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  position: relative;
-  overflow: hidden;
-  font-weight: 700;
-  letter-spacing: 0.3px;
+  background: linear-gradient(135deg,#667eea,#764ba2);
+  border-radius: 12px;
+  padding: 14px 20px;
+  font-weight: 600;
+  box-shadow: 0 10px 24px rgba(102,126,234,.35);
 }
+
 
 .btn-submit::before {
   content: '';
@@ -673,11 +665,12 @@ select.form-input:hover {
 }
 
 .btn-submit:hover {
-  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-  transform: translateY(-3px);
-  box-shadow: 
-    0 8px 24px rgba(102, 126, 234, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.btn-cancel {
+  background: #f1f5f9;
+  border-radius: 12px;
 }
 
 .btn-submit:hover::before {
@@ -693,7 +686,7 @@ select.form-input:hover {
 
 /* Scrollbar styling for modal */
 .modal-content::-webkit-scrollbar {
-  width: 4px;
+  width: 6px;
 }
 
 .modal-content::-webkit-scrollbar-track {
@@ -701,7 +694,7 @@ select.form-input:hover {
 }
 
 .modal-content::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(100,100,100,.25);
   border-radius: 10px;
 }
 

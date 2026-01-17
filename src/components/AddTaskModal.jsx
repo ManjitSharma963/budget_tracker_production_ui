@@ -64,13 +64,18 @@ function AddTaskModal({ isOpen, onClose, onSubmit, editTask = null, existingTask
 
   useEffect(() => {
     if (editTask && isOpen) {
+      // Ensure status matches one of the valid status options
+      const validStatuses = ['pending', 'running', 'completed', 'rejected']
+      const taskStatus = editTask.status?.toLowerCase() || 'pending'
+      const validStatus = validStatuses.includes(taskStatus) ? taskStatus : 'pending'
+      
       setFormData({
         title: editTask.title || '',
         subtitle: editTask.subtitle || '',
         date: editTask.date ? editTask.date.split('T')[0] : new Date().toISOString().split('T')[0],
         startTime: editTask.startTime || '',
         endTime: editTask.endTime || '',
-        status: editTask.status || 'pending',
+        status: validStatus,
         reminderEnabled: editTask.reminderEnabled || false,
         reminderTime: editTask.reminderTime || '',
         reminderDate: editTask.reminderDate ? editTask.reminderDate.split('T')[0] : new Date().toISOString().split('T')[0]
@@ -176,14 +181,25 @@ function AddTaskModal({ isOpen, onClose, onSubmit, editTask = null, existingTask
   }
 
   return (
-    <div className="modal-overlay" onClick={handleClose} style={{ pointerEvents: 'auto' }}>
-      <div className="modal-content task-modal" onClick={(e) => e.stopPropagation()} style={{ pointerEvents: 'auto' }}>
+    <div className="modal-overlay" onClick={handleClose}>
+      <div 
+        className="modal-content task-modal" 
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h2>{isEditMode ? 'Edit Task' : 'Add New Task'}</h2>
           <button className="close-btn" onClick={handleClose}>×</button>
         </div>
         
-        <form onSubmit={handleSubmit} className="modal-form">
+        <form 
+          onSubmit={handleSubmit} 
+          className="modal-form"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
           <div className="form-group">
             <label htmlFor="title">Title *</label>
             <input

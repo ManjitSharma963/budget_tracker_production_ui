@@ -1,9 +1,15 @@
 .savings-goal-modal {
   max-width: 500px;
+  pointer-events: auto;
+  z-index: 10001;
+  position: relative;
 }
 
 .savings-goal-modal .form-group {
   margin-bottom: 16px;
+  position: relative;
+  z-index: 10;
+  pointer-events: auto;
 }
 
 .savings-goal-modal .form-input {
@@ -13,12 +19,17 @@
   border-radius: 8px;
   font-size: 14px;
   transition: all 0.3s ease;
+  pointer-events: auto;
+  position: relative;
+  z-index: 10;
 }
 
 .savings-goal-modal .form-input:focus {
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  pointer-events: auto;
+  z-index: 100;
 }
 
 .savings-goal-modal .form-input.error {

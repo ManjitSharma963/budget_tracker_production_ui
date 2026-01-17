@@ -87,8 +87,13 @@ function PartyDetailsModal({ isOpen, onClose, party, ledgerEntries, onAddPayment
   }
 
   return (
-    <div className="modal-overlay party-details-overlay" onClick={onClose} style={{ pointerEvents: 'auto' }}>
-      <div className="modal-content party-details-modal" onClick={(e) => e.stopPropagation()} style={{ pointerEvents: 'auto' }}>
+    <div className="modal-overlay party-details-overlay" onClick={onClose}>
+      <div 
+        className="modal-content party-details-modal" 
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h2>{party.name}</h2>
           <button className="close-button" onClick={onClose}>×</button>

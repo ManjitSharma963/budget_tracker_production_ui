@@ -35,6 +35,9 @@
     0 0 0 1px rgba(255, 255, 255, 0.1);
   animation: slideUp 0.3s ease-out;
   overflow: hidden;
+  pointer-events: auto;
+  z-index: 10001;
+  position: relative;
 }
 
 @keyframes slideUp {
@@ -92,12 +95,18 @@
   gap: 20px;
   overflow-y: auto;
   flex: 1;
+  pointer-events: auto;
+  z-index: 2;
+  position: relative;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  position: relative;
+  z-index: 10;
+  pointer-events: auto;
 }
 
 .form-group label {
@@ -119,6 +128,9 @@
   background: #ffffff;
   transition: all 0.2s ease;
   box-sizing: border-box;
+  pointer-events: auto;
+  position: relative;
+  z-index: 10;
 }
 
 .form-input::placeholder {
@@ -131,6 +143,8 @@
   border-color: #667eea;
   background: #ffffff;
   box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  pointer-events: auto;
+  z-index: 100;
 }
 
 .textarea-input {

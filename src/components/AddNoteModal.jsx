@@ -64,14 +64,25 @@ function AddNoteModal({ isOpen, onClose, onSubmit, editNote = null }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={handleClose} style={{ pointerEvents: 'auto' }}>
-      <div className="modal-content note-modal" onClick={(e) => e.stopPropagation()} style={{ pointerEvents: 'auto' }}>
+    <div className="modal-overlay" onClick={handleClose}>
+      <div 
+        className="modal-content note-modal" 
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h2>{isEditMode ? 'Edit Note' : 'Add New Note'}</h2>
           <button className="close-btn" onClick={handleClose}>×</button>
         </div>
         
-        <form onSubmit={handleSubmit} className="modal-form">
+        <form 
+          onSubmit={handleSubmit} 
+          className="modal-form"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
           <div className="form-group">
             <label htmlFor="title">Title *</label>
             <input

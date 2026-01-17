@@ -29,12 +29,23 @@ function BudgetModal({ isOpen, onClose, onSubmit, budgets = [], monthlyIncome = 
       const isCustomCategory = !expenseCategories.includes(editBudget.category)
       setShowCustomCategory(isCustomCategory)
       setCustomCategory(isCustomCategory ? editBudget.category : '')
+      
+      // Ensure budgetType matches valid options
+      const validBudgetType = (editBudget.budgetType === 'fixed' || editBudget.budgetType === 'percentage') 
+        ? editBudget.budgetType 
+        : 'fixed'
+      
+      // Ensure period matches valid options
+      const validPeriod = (editBudget.period === 'monthly' || editBudget.period === 'yearly')
+        ? editBudget.period
+        : 'monthly'
+      
       setFormData({
         category: isCustomCategory ? 'Custom' : editBudget.category || '',
-        budgetType: editBudget.budgetType || 'fixed',
+        budgetType: validBudgetType,
         amount: editBudget.amount?.toString() || '',
         percentage: editBudget.percentage?.toString() || '',
-        period: editBudget.period || 'monthly'
+        period: validPeriod
       })
     } else if (!isOpen) {
       setFormData({
@@ -195,14 +206,25 @@ function BudgetModal({ isOpen, onClose, onSubmit, budgets = [], monthlyIncome = 
   )
 
   return (
-    <div className="modal-overlay" onClick={onClose} style={{ pointerEvents: 'auto' }}>
-      <div className="modal-content budget-modal" onClick={(e) => e.stopPropagation()} style={{ pointerEvents: 'auto' }}>
+    <div className="modal-overlay" onClick={onClose}>
+      <div 
+        className="modal-content budget-modal" 
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h2>{editingBudget ? 'Edit Budget' : 'Add Budget'}</h2>
           <button className="close-btn" onClick={onClose}>×</button>
         </div>
         
-        <form onSubmit={handleSubmit} className="modal-form">
+        <form 
+          onSubmit={handleSubmit} 
+          className="modal-form"
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          onTouchStart={(e) => e.stopPropagation()}
+        >
           <div className="form-group">
             <label htmlFor="category">Category *</label>
             <select
