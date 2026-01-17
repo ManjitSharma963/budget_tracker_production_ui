@@ -32,7 +32,6 @@ import MonthlySummary from './components/MonthlySummary'
 import StatisticsCards from './components/StatisticsCards'
 import Toast from './components/Toast'
 import { expensesAPI, incomeAPI, creditsAPI, notesAPI, partiesAPI, ledgerAPI, tasksAPI, budgetsAPI, recurringAPI, templatesAPI, savingsGoalsAPI } from './services/api'
-import { getPreferredCurrency, savePreferredCurrency } from './services/currency'
 import { requestNotificationPermission, scheduleAllTaskReminders } from './services/notifications'
 import { mapExpenseFromAPI, mapExpenseToAPI, mapIncomeFromAPI, mapIncomeToAPI, mapCreditFromAPI, mapCreditToAPI } from './utils/dataMapper'
 import { exportTransactionsToCSV, exportCreditsToCSV } from './utils/csvExport'
@@ -91,7 +90,6 @@ function App() {
   const [isLoading, setIsLoading] = useState(false)
   const [toast, setToast] = useState({ isVisible: false, message: '', type: 'success' })
   const [darkMode, setDarkMode] = useState(false)
-  const [preferredCurrency, setPreferredCurrency] = useState(getPreferredCurrency())
   const [confirmationDialog, setConfirmationDialog] = useState({ isOpen: false })
   const [lastDeletedItem, setLastDeletedItem] = useState(null)
 
@@ -99,10 +97,6 @@ function App() {
   useEffect(() => {
     // Request notification permission on app load
     requestNotificationPermission()
-    
-    // Load preferred currency
-    const savedCurrency = getPreferredCurrency()
-    setPreferredCurrency(savedCurrency)
   }, [])
 
   // Schedule task reminders when tasks change

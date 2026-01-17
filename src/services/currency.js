@@ -86,13 +86,16 @@ export const fetchExchangeRates = async (baseCurrency = 'INR') => {
   })
 }
 
-// Save user's preferred currency to localStorage
+// Currency is fixed to Indian Rupees (INR)
+// Save user's preferred currency to localStorage (kept for backward compatibility)
 export const savePreferredCurrency = (currencyCode) => {
-  localStorage.setItem('preferredCurrency', currencyCode)
+  // Currency selection is disabled - always using INR
+  localStorage.setItem('preferredCurrency', 'INR')
 }
 
 // Get user's preferred currency from localStorage
+// Always returns INR as currency is fixed
 export const getPreferredCurrency = () => {
-  return localStorage.getItem('preferredCurrency') || 'INR'
+  return 'INR'
 }
 
