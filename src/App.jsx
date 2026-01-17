@@ -431,8 +431,14 @@ function App() {
       setEditTransaction(transaction)
       setViewMode('credits')
     } else {
-      // It's a regular transaction
+      // It's a regular transaction - set viewMode based on transaction type
       setEditTransaction(transaction)
+      if (transaction.type === 'income') {
+        setViewMode('income')
+      } else if (transaction.type === 'expense') {
+        setViewMode('expenses')
+      }
+      // If type is not set, keep current viewMode
     }
     setIsModalOpen(true)
   }

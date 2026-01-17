@@ -251,10 +251,15 @@ function AddExpenseModal({ isOpen, onClose, onSubmit, viewMode, editTransaction 
         return
       }
 
+      // Determine type: use editTransaction.type if editing, otherwise use viewMode
+      const transactionType = isEditMode && editTransaction?.type 
+        ? editTransaction.type 
+        : (viewMode === 'expenses' ? 'expense' : 'income')
+      
       const submitData = {
         ...formData,
         category: finalCategory,
-        type: viewMode === 'expenses' ? 'expense' : 'income',
+        type: transactionType,
         amount: parseFloat(formData.amount),
         id: isEditMode ? editTransaction.id : undefined,
         isRecurring: formData.isRecurring,
